@@ -36,6 +36,8 @@ public class PdfCanvas extends Canvas {
     private boolean    isCreating;
     private double     createStartX, createStartY;
     private Annotation creatingAnnotation;
+    private String     resizeHandle;          // "NW","NE","SW","SE" or null
+    private double     oldAnnotW, oldAnnotH;  // old size at resize start
 
     /** Side length of each corner selection handle square, in canvas pixels. */
     protected static final double HANDLE_SIZE = 8.0;
@@ -182,6 +184,21 @@ public class PdfCanvas extends Canvas {
         var mapper = mapper();
 
         if (getActiveTool() == Tool.SELECT) {
+            // Check if clicking a resize handle of the selected annotation
+            if (getSelectedAnnotation() != null) {
+                String handle = hitTestHandle(cx, cy, getSelectedAnnotation(), mapper);
+                if (handle != null) {
+                    resizeHandle = handle;
+                    setIsDragging(false);
+                    setDragStart(cx, cy);
+                    setAnnotStart(getSelectedAnnotation().getX(), getSelectedAnnotation().getY());
+                    oldAnnotW = getSelectedAnnotation().getWidth();
+                    oldAnnotH = getSelectedAnnotation().getHeight();
+                    return;
+                }
+            }
+            resizeHandle = null;
+
             // Hit test annotations in reverse order (top-most first)
             var annotations = currentPage.getAnnotations();
             Annotation hit = null;
@@ -223,6 +240,34 @@ public class PdfCanvas extends Canvas {
         if (currentPage == null) return;
         var mapper = mapper();
 
+        // Resize via handle drag
+        if (getActiveTool() == Tool.SELECT && resizeHandle != null && getSelectedAnnotation() != null) {
+            var ann    = getSelectedAnnotation();
+            double pdfX = mapper.canvasXToPdf(cx);
+            double pdfY = mapper.canvasYToPdf(cy);
+            double x = ann.getX(), y = ann.getY(), w = ann.getWidth(), h = ann.getHeight();
+            // Compute fixed corner (the corner opposite the dragged handle) in PDF space
+            double fixedPdfX = x, fixedPdfY = y;
+            switch (resizeHandle) {
+                case "SE" -> { fixedPdfX = x;     fixedPdfY = y + h; }
+                case "SW" -> { fixedPdfX = x + w; fixedPdfY = y + h; }
+                case "NE" -> { fixedPdfX = x;     fixedPdfY = y;     }
+                case "NW" -> { fixedPdfX = x + w; fixedPdfY = y;     }
+                default   -> { return; }
+            }
+            double newX = Math.min(fixedPdfX, pdfX);
+            double newY = Math.min(fixedPdfY, pdfY);
+            double newW = Math.abs(pdfX - fixedPdfX);
+            double newH = Math.abs(pdfY - fixedPdfY);
+            if (newW > 1 && newH > 1) {
+                ann.setX(newX); ann.setY(newY);
+                ann.setWidth(newW); ann.setHeight(newH);
+                getPropertiesPanel().showAnnotation(ann);
+                redraw();
+            }
+            return;
+        }
+
         if (getActiveTool() == Tool.SELECT && getIsDragging() && getSelectedAnnotation() != null) {
             // Move: translate PDF coords by delta
             double dx =  mapper.canvasDimToPdf(cx - getDragStartX());
@@ -259,6 +304,23 @@ public class PdfCanvas extends Canvas {
     protected void onMouseReleased(double cx, double cy) {
         if (currentPage == null) return;
 
+        // Commit resize
+        if (getActiveTool() == Tool.SELECT && resizeHandle != null && getSelectedAnnotation() != null) {
+            var ann    = getSelectedAnnotation();
+            double finalX = ann.getX(), finalY = ann.getY();
+            double finalW = ann.getWidth(), finalH = ann.getHeight();
+            double startX = getAnnotStartX(), startY = getAnnotStartY();
+            // Reset to original so ResizeAnnotationCommand.execute() applies the resize correctly
+            ann.setX(startX); ann.setY(startY);
+            ann.setWidth(oldAnnotW); ann.setHeight(oldAnnotH);
+            getUndoManager().execute(new com.pdfescroto.command.ResizeAnnotationCommand(
+                    ann, startX, startY, oldAnnotW, oldAnnotH,
+                        finalX, finalY, finalW, finalH));
+            resizeHandle = null;
+            redraw();
+            return;
+        }
+
         if (getActiveTool() == Tool.SELECT && getIsDragging() && getSelectedAnnotation() != null) {
             // Commit move as undoable command (only if the annotation actually moved)
             var ann   = getSelectedAnnotation();
@@ -267,13 +329,14 @@ public class PdfCanvas extends Canvas {
             double oldX   = getAnnotStartX();
             double oldY   = getAnnotStartY();
             if (Math.abs(finalX - oldX) > 0.5 || Math.abs(finalY - oldY) > 0.5) {
-                // Move already applied to model — wrap in command so undo can restore
-                getUndoManager().execute(new com.pdfescroto.command.EditAnnotationCommand(
-                        () -> { ann.setX(finalX); ann.setY(finalY); redraw(); },
-                        () -> { ann.setX(oldX);   ann.setY(oldY);   redraw(); }
-                ));
+                // Reset to old position so MoveAnnotationCommand.execute() applies the move correctly
+                ann.setX(oldX);
+                ann.setY(oldY);
+                getUndoManager().execute(new com.pdfescroto.command.MoveAnnotationCommand(
+                        ann, oldX, oldY, finalX, finalY));
             }
             setIsDragging(false);
+            redraw();
 
         } else if (isCreating() && getCreatingAnnotation() != null) {
             var ann = getCreatingAnnotation();
@@ -461,6 +524,42 @@ public class PdfCanvas extends Canvas {
             case IMAGE    -> new ImageAnnotation(pdfX, pdfY, w, h);
             default       -> throw new IllegalStateException("Not a creation tool: " + getActiveTool());
         };
+    }
+
+    /**
+     * Returns the handle name ("NW", "NE", "SW", "SE") if (cx,cy) is within HANDLE_SIZE
+     * pixels of a corner handle of annotation {@code a}, or {@code null} if no handle hit.
+     *
+     * @param cx     canvas X coordinate of the test point
+     * @param cy     canvas Y coordinate of the test point
+     * @param a      the annotation whose handles to test
+     * @param mapper the coordinate mapper for the current view state
+     * @return handle name, or {@code null} if no handle was hit
+     */
+    private String hitTestHandle(double cx, double cy, Annotation a, CoordinateMapper mapper) {
+        double ax = mapper.pdfXToCanvas(a.getX());
+        double ay = mapper.pdfYToCanvasTop(a.getY(), a.getHeight());
+        double aw = mapper.pdfDimToCanvas(a.getWidth());
+        double ah = mapper.pdfDimToCanvas(a.getHeight());
+        if (near(cx, ax,      cy, ay)      ) return "NW";
+        if (near(cx, ax + aw, cy, ay)      ) return "NE";
+        if (near(cx, ax,      cy, ay + ah) ) return "SW";
+        if (near(cx, ax + aw, cy, ay + ah) ) return "SE";
+        return null;
+    }
+
+    /**
+     * Returns {@code true} if canvas point (cx, cy) is within HANDLE_SIZE pixels
+     * of the handle anchor (hx, hy).
+     *
+     * @param cx canvas X of the test point
+     * @param hx canvas X of the handle centre
+     * @param cy canvas Y of the test point
+     * @param hy canvas Y of the handle centre
+     * @return {@code true} if within tolerance
+     */
+    private boolean near(double cx, double hx, double cy, double hy) {
+        return Math.abs(cx - hx) < HANDLE_SIZE && Math.abs(cy - hy) < HANDLE_SIZE;
     }
 
     /**
