@@ -170,29 +170,129 @@ public class PdfCanvas extends Canvas {
 
     /**
      * Invoked when a mouse button is pressed on the canvas.
-     * Subclasses override this to implement tool-specific drag and selection logic.
+     * In SELECT mode, performs a hit test against annotations and begins a drag move.
+     * In creation modes, records the PDF-space start point and creates a zero-size ghost.
      *
      * @param cx      canvas X coordinate of the press
      * @param cy      canvas Y coordinate of the press
      * @param primary {@code true} if the primary (left) mouse button is down
      */
-    protected void onMousePressed(double cx, double cy, boolean primary)  {}
+    protected void onMousePressed(double cx, double cy, boolean primary) {
+        if (!primary || currentPage == null) return;
+        var mapper = mapper();
+
+        if (getActiveTool() == Tool.SELECT) {
+            // Hit test annotations in reverse order (top-most first)
+            var annotations = currentPage.getAnnotations();
+            Annotation hit = null;
+            for (int i = annotations.size() - 1; i >= 0; i--) {
+                if (hitTest(annotations.get(i), cx, cy, mapper)) {
+                    hit = annotations.get(i);
+                    break;
+                }
+            }
+            setSelectedAnnotation(hit);
+            if (hit != null) {
+                setIsDragging(true);
+                setDragStart(cx, cy);
+                setAnnotStart(hit.getX(), hit.getY());
+            }
+            redraw();
+
+        } else {
+            // Creation tools: record start in PDF coords
+            double pdfX = mapper.canvasXToPdf(cx);
+            double pdfY = mapper.canvasYToPdf(cy);
+            setCreateStart(pdfX, pdfY);
+            setCreating(true);
+            setCreatingAnnotation(createAnnotation(pdfX, pdfY, 0, 0));
+            setSelectedAnnotation(null);
+            redraw();
+        }
+    }
 
     /**
      * Invoked while the mouse is dragged across the canvas.
+     * In SELECT mode with an active drag, moves the selected annotation.
+     * In creation mode, resizes the ghost annotation to match the current mouse position.
      *
      * @param cx canvas X coordinate
      * @param cy canvas Y coordinate
      */
-    protected void onMouseDragged(double cx, double cy)                   {}
+    protected void onMouseDragged(double cx, double cy) {
+        if (currentPage == null) return;
+        var mapper = mapper();
+
+        if (getActiveTool() == Tool.SELECT && getIsDragging() && getSelectedAnnotation() != null) {
+            // Move: translate PDF coords by delta
+            double dx =  mapper.canvasDimToPdf(cx - getDragStartX());
+            double dy = -mapper.canvasDimToPdf(cy - getDragStartY()); // Y axis flip
+            var ann = getSelectedAnnotation();
+            ann.setX(getAnnotStartX() + dx);
+            ann.setY(getAnnotStartY() + dy);
+            getPropertiesPanel().showAnnotation(ann);
+            redraw();
+
+        } else if (isCreating() && getCreatingAnnotation() != null) {
+            // Resize creation ghost from start corner to current mouse position
+            double pdfX = mapper.canvasXToPdf(cx);
+            double pdfY = mapper.canvasYToPdf(cy);
+            double x = Math.min(getCreateStartX(), pdfX);
+            double y = Math.min(getCreateStartY(), pdfY);
+            double w = Math.abs(pdfX - getCreateStartX());
+            double h = Math.abs(pdfY - getCreateStartY());
+            var ann = getCreatingAnnotation();
+            // Bypass the constructor guard — allow zero during drag
+            ann.setX(x); ann.setY(y); ann.setWidth(w); ann.setHeight(h);
+            redraw();
+        }
+    }
 
     /**
      * Invoked when a mouse button is released on the canvas.
+     * In SELECT mode, commits a completed drag as an undoable command.
+     * In creation mode, commits the new annotation if its size exceeds a minimum threshold.
      *
      * @param cx canvas X coordinate of the release
      * @param cy canvas Y coordinate of the release
      */
-    protected void onMouseReleased(double cx, double cy)                  {}
+    protected void onMouseReleased(double cx, double cy) {
+        if (currentPage == null) return;
+
+        if (getActiveTool() == Tool.SELECT && getIsDragging() && getSelectedAnnotation() != null) {
+            // Commit move as undoable command (only if the annotation actually moved)
+            var ann   = getSelectedAnnotation();
+            double finalX = ann.getX();
+            double finalY = ann.getY();
+            double oldX   = getAnnotStartX();
+            double oldY   = getAnnotStartY();
+            if (Math.abs(finalX - oldX) > 0.5 || Math.abs(finalY - oldY) > 0.5) {
+                // Move already applied to model — wrap in command so undo can restore
+                getUndoManager().execute(new com.pdfescroto.command.EditAnnotationCommand(
+                        () -> { ann.setX(finalX); ann.setY(finalY); redraw(); },
+                        () -> { ann.setX(oldX);   ann.setY(oldY);   redraw(); }
+                ));
+            }
+            setIsDragging(false);
+
+        } else if (isCreating() && getCreatingAnnotation() != null) {
+            var ann = getCreatingAnnotation();
+            // Only commit if the annotation has meaningful size (not a stray click)
+            if (ann.getWidth() > 2 && ann.getHeight() > 2) {
+                getUndoManager().execute(
+                        new com.pdfescroto.command.AddAnnotationCommand(getCurrentPage(), ann));
+                setSelectedAnnotation(ann);
+
+                // For image annotations: prompt file chooser after creation
+                if (getActiveTool() == Tool.IMAGE) {
+                    promptImageFile((ImageAnnotation) ann);
+                }
+            }
+            setCreating(false);
+            setCreatingAnnotation(null);
+            redraw();
+        }
+    }
 
     // ---- Actions ----
 
@@ -322,4 +422,68 @@ public class PdfCanvas extends Canvas {
 
     /** @return {@code true} while a drag move is active */
     protected boolean       getIsDragging()                     { return isDragging; }
+
+    // ---- Private helpers ----
+
+    /**
+     * Returns {@code true} if the canvas point (cx, cy) falls within the bounding box
+     * of the given annotation.
+     *
+     * @param a      the annotation to test
+     * @param cx     canvas X coordinate of the point to test
+     * @param cy     canvas Y coordinate of the point to test
+     * @param mapper the coordinate mapper for the current view state
+     * @return {@code true} if the point is inside the annotation bounds
+     */
+    private boolean hitTest(Annotation a, double cx, double cy, CoordinateMapper mapper) {
+        double ax = mapper.pdfXToCanvas(a.getX());
+        double ay = mapper.pdfYToCanvasTop(a.getY(), a.getHeight());
+        double aw = mapper.pdfDimToCanvas(a.getWidth());
+        double ah = mapper.pdfDimToCanvas(a.getHeight());
+        return cx >= ax && cx <= ax + aw && cy >= ay && cy <= ay + ah;
+    }
+
+    /**
+     * Creates a new annotation of the type corresponding to the current active tool,
+     * positioned at the given PDF coordinates with the given dimensions.
+     *
+     * @param pdfX PDF X coordinate (points)
+     * @param pdfY PDF Y coordinate (points)
+     * @param w    width in PDF points
+     * @param h    height in PDF points
+     * @return a new annotation instance for the active creation tool
+     * @throws IllegalStateException if the active tool is not a creation tool
+     */
+    private Annotation createAnnotation(double pdfX, double pdfY, double w, double h) {
+        return switch (getActiveTool()) {
+            case TEXT     -> new TextAnnotation(pdfX, pdfY, w, h);
+            case CHECKBOX -> new CheckboxAnnotation(pdfX, pdfY, w, h);
+            case IMAGE    -> new ImageAnnotation(pdfX, pdfY, w, h);
+            default       -> throw new IllegalStateException("Not a creation tool: " + getActiveTool());
+        };
+    }
+
+    /**
+     * Opens a file chooser to let the user select an image file and loads its data
+     * into the given {@link ImageAnnotation}. Displays an error alert on failure.
+     *
+     * @param ia the image annotation to populate with the chosen file
+     */
+    private void promptImageFile(ImageAnnotation ia) {
+        var chooser = new javafx.stage.FileChooser();
+        chooser.setTitle("Choose Image");
+        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(
+                "Images", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp"));
+        var file = chooser.showOpenDialog(getScene().getWindow());
+        if (file == null) return;
+        try {
+            ia.setImageData(java.nio.file.Files.readAllBytes(file.toPath()));
+            ia.setFxImage(new javafx.scene.image.Image(file.toURI().toString()));
+            redraw();
+        } catch (java.io.IOException e) {
+            var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
+            alert.setContentText("Could not load image: " + e.getMessage());
+            alert.showAndWait();
+        }
+    }
 }
