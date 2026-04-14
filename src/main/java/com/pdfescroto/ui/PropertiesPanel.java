@@ -61,12 +61,13 @@ public class PropertiesPanel {
         // Text content
         commitOnChange(textField, () -> {
             if (!(current instanceof TextAnnotation ta)) return;
-            String old = ta.getText();
+            var ann = ta; // ta is already a captured local from the pattern binding
+            String old = ann.getText();
             String nw  = textField.getText();
             if (old.equals(nw)) return;
             undoManager.execute(new EditAnnotationCommand(
-                    () -> { ta.setText(nw);  onRedraw.run(); },
-                    () -> { ta.setText(old); onRedraw.run(); }));
+                    () -> { ann.setText(nw);  onRedraw.run(); },
+                    () -> { ann.setText(old); onRedraw.run(); }));
         });
 
         // Font size
@@ -137,27 +138,29 @@ public class PropertiesPanel {
 
     private void commitMove() {
         if (current == null) return;
+        var ann = current; // capture before any async operation
         try {
-            double oldX = current.getX(), oldY = current.getY();
+            double oldX = ann.getX(), oldY = ann.getY();
             double newX = Double.parseDouble(xField.getText());
             double newY = Double.parseDouble(yField.getText());
             if (oldX == newX && oldY == newY) return;
             undoManager.execute(new EditAnnotationCommand(
-                    () -> { current.setX(newX); current.setY(newY); onRedraw.run(); },
-                    () -> { current.setX(oldX); current.setY(oldY); onRedraw.run(); }));
+                    () -> { ann.setX(newX); ann.setY(newY); onRedraw.run(); },
+                    () -> { ann.setX(oldX); ann.setY(oldY); onRedraw.run(); }));
         } catch (NumberFormatException ignored) {}
     }
 
     private void commitResize() {
         if (current == null) return;
+        var ann = current; // capture before any async operation
         try {
-            double oldW = current.getWidth(), oldH = current.getHeight();
+            double oldW = ann.getWidth(), oldH = ann.getHeight();
             double newW = Double.parseDouble(wField.getText());
             double newH = Double.parseDouble(hField.getText());
             if (oldW == newW && oldH == newH) return;
             undoManager.execute(new EditAnnotationCommand(
-                    () -> { current.setWidth(newW); current.setHeight(newH); onRedraw.run(); },
-                    () -> { current.setWidth(oldW); current.setHeight(oldH); onRedraw.run(); }));
+                    () -> { ann.setWidth(newW); ann.setHeight(newH); onRedraw.run(); },
+                    () -> { ann.setWidth(oldW); ann.setHeight(oldH); onRedraw.run(); }));
         } catch (NumberFormatException ignored) {}
     }
 

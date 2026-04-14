@@ -247,12 +247,12 @@ public class PdfCanvas extends Canvas {
             double pdfY = mapper.canvasYToPdf(cy);
             double x = ann.getX(), y = ann.getY(), w = ann.getWidth(), h = ann.getHeight();
             // Compute fixed corner (the corner opposite the dragged handle) in PDF space
-            double fixedPdfX = x, fixedPdfY = y;
+            double fixedPdfX, fixedPdfY;
             switch (resizeHandle) {
-                case "SE" -> { fixedPdfX = x;     fixedPdfY = y + h; }
-                case "SW" -> { fixedPdfX = x + w; fixedPdfY = y + h; }
-                case "NE" -> { fixedPdfX = x;     fixedPdfY = y;     }
-                case "NW" -> { fixedPdfX = x + w; fixedPdfY = y;     }
+                case "SE" -> { fixedPdfX = x;     fixedPdfY = y + h; } // drag SE → fixed NW (PDF top-left)
+                case "NW" -> { fixedPdfX = x + w; fixedPdfY = y;     } // drag NW → fixed SE (PDF bottom-right)
+                case "NE" -> { fixedPdfX = x;     fixedPdfY = y;     } // drag NE → fixed SW (PDF bottom-left)
+                case "SW" -> { fixedPdfX = x + w; fixedPdfY = y + h; } // drag SW → fixed NE (PDF top-right)
                 default   -> { return; }
             }
             double newX = Math.min(fixedPdfX, pdfX);

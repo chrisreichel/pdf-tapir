@@ -114,8 +114,8 @@ public class PdfSaver {
         annot.setContents(ta.getText());
         annot.setRectangle(rect);
         // Store font size in the title popup field (/T) so it can be recovered by PdfLoader
-        annot.setTitlePopup("fs=" + (int) ta.getFontSize());
-        annot.setDefaultAppearance("/Helvetica " + (int) ta.getFontSize() + " Tf 0 0 0 rg");
+        annot.setTitlePopup("fs=" + ta.getFontSize()); // store as float string, e.g. "fs=11.5"
+        annot.setDefaultAppearance("/Helvetica " + ta.getFontSize() + " Tf 0 0 0 rg");
         annotations.add(annot);
     }
 
