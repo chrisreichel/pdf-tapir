@@ -40,7 +40,7 @@ public class UndoManager {
      */
     public void execute(Command cmd) {
         cmd.execute();
-        if (undoStack.size() == limit) undoStack.pollFirst();
+        if (undoStack.size() == limit) undoStack.pollLast();
         undoStack.push(cmd);
         redoStack.clear();
     }

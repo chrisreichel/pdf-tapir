@@ -70,12 +70,19 @@ class UndoManagerTest {
     void boundedStack_dropsOldestWhenFull() {
         var list = new ArrayList<String>();
         var mgr  = new UndoManager(3);
-        mgr.execute(new AppendCommand(list, "a"));
+        mgr.execute(new AppendCommand(list, "a")); // oldest — should be dropped
         mgr.execute(new AppendCommand(list, "b"));
         mgr.execute(new AppendCommand(list, "c"));
-        mgr.execute(new AppendCommand(list, "d")); // should drop "a"
-        // Can only undo 3 times
-        mgr.undo(); mgr.undo(); mgr.undo();
-        assertFalse(mgr.canUndo());
+        mgr.execute(new AppendCommand(list, "d")); // "a" should be dropped here
+
+        assertEquals(List.of("a", "b", "c", "d"), list); // all four were executed
+
+        // After 3 undos the list should be ["a"] — proving "b","c","d" were undone
+        // but "a" was dropped from history so it can't be undone
+        mgr.undo(); // undo "d" → list = ["a","b","c"]
+        mgr.undo(); // undo "c" → list = ["a","b"]
+        mgr.undo(); // undo "b" → list = ["a"]
+        assertEquals(List.of("a"), list);
+        assertFalse(mgr.canUndo()); // "a" was the dropped command — no more history
     }
 }
