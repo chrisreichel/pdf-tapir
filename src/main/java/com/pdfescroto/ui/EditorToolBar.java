@@ -26,6 +26,7 @@ public class EditorToolBar {
     private final PdfDocument doc;
     private       PdfCanvas   canvas;
     private final Label       pageLabel   = new Label("Page — / —");
+    private final Label       zoomLabel   = new Label("100%");
     private int currentPage = 0;
 
     /**
@@ -76,7 +77,7 @@ public class EditorToolBar {
         });
 
         node.getChildren().addAll(selectBtn, textBtn, cbBtn, imgBtn,
-                sep, prevBtn, pageLabel, nextBtn, spacer, saveBtn);
+                sep, prevBtn, pageLabel, nextBtn, spacer, zoomLabel, saveBtn);
     }
 
     /**
@@ -122,7 +123,12 @@ public class EditorToolBar {
      *
      * @param canvas the canvas to bind
      */
-    public void bindCanvas(PdfCanvas canvas) { this.canvas = canvas; }
+    public void bindCanvas(PdfCanvas canvas) {
+        this.canvas = canvas;
+        zoomLabel.setText(Math.round(canvas.getScale() * 100) + "%");
+        canvas.scaleProperty().addListener((obs, oldVal, newVal) ->
+                zoomLabel.setText(Math.round(newVal.doubleValue() * 100) + "%"));
+    }
 
     /**
      * Returns the JavaFX node that represents this toolbar in the scene graph.

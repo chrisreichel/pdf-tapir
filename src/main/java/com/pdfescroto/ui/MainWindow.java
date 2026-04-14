@@ -7,6 +7,9 @@ import com.pdfescroto.service.PdfSaver;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -32,6 +35,7 @@ public class MainWindow {
     private PdfDocument     openDocument;
     private PdfCanvas       canvas;
     private PropertiesPanel propertiesPanel;
+    private ScrollPane      scrollPane;
 
     /**
      * Creates the main window and wires all permanent UI components.
@@ -72,7 +76,18 @@ public class MainWindow {
         redoItem.setOnAction(e -> { undoManager.redo(); if (canvas != null) canvas.redraw(); });
         var editMenu = new Menu("Edit", null, undoItem, redoItem);
 
-        return new MenuBar(fileMenu, editMenu);
+        var zoomInItem  = new MenuItem("Zoom In");
+        var zoomOutItem = new MenuItem("Zoom Out");
+        var fitPageItem = new MenuItem("Fit Page");
+        zoomInItem.setAccelerator(new KeyCodeCombination(KeyCode.EQUALS, KeyCombination.SHORTCUT_DOWN));
+        zoomOutItem.setAccelerator(new KeyCodeCombination(KeyCode.MINUS,  KeyCombination.SHORTCUT_DOWN));
+        fitPageItem.setAccelerator(new KeyCodeCombination(KeyCode.DIGIT0, KeyCombination.SHORTCUT_DOWN));
+        zoomInItem.setOnAction(e  -> { if (canvas != null) canvas.zoomIn(); });
+        zoomOutItem.setOnAction(e -> { if (canvas != null) canvas.zoomOut(); });
+        fitPageItem.setOnAction(e -> { if (canvas != null && scrollPane != null) canvas.fitPage(scrollPane); });
+        var viewMenu = new Menu("View", null, zoomInItem, zoomOutItem, new SeparatorMenuItem(), fitPageItem);
+
+        return new MenuBar(fileMenu, editMenu, viewMenu);
     }
 
     private void setupKeyboardShortcuts() {
@@ -119,7 +134,7 @@ public class MainWindow {
         canvas      = new PdfCanvas(openDocument, undoManager, propertiesPanel);
         toolbar.bindCanvas(canvas);
 
-        var scrollPane = new ScrollPane(canvas);
+        scrollPane = new ScrollPane(canvas);
         scrollPane.setPannable(true);
 
         root.setTop(new VBox(buildMenuBar(), toolbar.getNode()));

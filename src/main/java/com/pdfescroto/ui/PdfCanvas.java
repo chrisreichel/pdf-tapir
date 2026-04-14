@@ -4,8 +4,11 @@ import com.pdfescroto.command.DeleteAnnotationCommand;
 import com.pdfescroto.command.UndoManager;
 import com.pdfescroto.model.*;
 import com.pdfescroto.service.CoordinateMapper;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 
@@ -25,7 +28,7 @@ public class PdfCanvas extends Canvas {
 
     private PdfPage    currentPage;
     private int        currentPageIndex    = 0;
-    private double     scale               = 1.0;
+    private final DoubleProperty scale = new SimpleDoubleProperty(1.0);
     private Tool       activeTool          = Tool.SELECT;
     private Annotation selectedAnnotation;
 
@@ -78,8 +81,8 @@ public class PdfCanvas extends Canvas {
 
     private void resizeCanvasToPage() {
         if (currentPage == null) return;
-        setWidth(currentPage.getPageWidthPt()  * scale);
-        setHeight(currentPage.getPageHeightPt() * scale);
+        setWidth(currentPage.getPageWidthPt()  * scale.get());
+        setHeight(currentPage.getPageHeightPt() * scale.get());
     }
 
     // ---- Rendering ----
@@ -123,8 +126,8 @@ public class PdfCanvas extends Canvas {
             gc.setLineWidth(selected ? 2.0 : 1.0);
             gc.strokeRect(cx, cy, cw, ch);
             gc.setFill(Color.BLACK);
-            gc.setFont(Font.font(ta.getFontSize() * scale));
-            gc.fillText(ta.getText(), cx + 3, cy + ta.getFontSize() * scale, cw - 6);
+            gc.setFont(Font.font(ta.getFontSize() * scale.get()));
+            gc.fillText(ta.getText(), cx + 3, cy + ta.getFontSize() * scale.get(), cw - 6);
 
         } else if (a instanceof CheckboxAnnotation ca) {
             gc.setStroke(selected ? Color.DODGERBLUE : Color.rgb(46, 125, 50, 0.9));
@@ -378,6 +381,46 @@ public class PdfCanvas extends Canvas {
      */
     public void setActiveTool(Tool tool) { this.activeTool = tool; }
 
+    // ---- Zoom ----
+
+    /** @return the scale property (1.0 = 100%) */
+    public DoubleProperty scaleProperty() { return scale; }
+
+    /** @return the current scale factor */
+    public double getScale() { return scale.get(); }
+
+    /**
+     * Sets the canvas scale, clamped to [0.25, 4.0], and redraws.
+     *
+     * @param s the desired scale factor
+     */
+    public void setScale(double s) {
+        scale.set(Math.max(0.25, Math.min(4.0, s)));
+        resizeCanvasToPage();
+        redraw();
+    }
+
+    /** Increases zoom by a factor of 1.25 (clamped at 400%). */
+    public void zoomIn()  { setScale(getScale() * 1.25); }
+
+    /** Decreases zoom by a factor of 1.25 (clamped at 25%). */
+    public void zoomOut() { setScale(getScale() / 1.25); }
+
+    /**
+     * Scales the canvas so the current page fits within the visible viewport of
+     * the given {@link ScrollPane}, choosing the smaller of width-fit and height-fit.
+     *
+     * @param sp the scroll pane whose viewport defines the available space
+     */
+    public void fitPage(ScrollPane sp) {
+        if (currentPage == null) return;
+        double vw = sp.getViewportBounds().getWidth();
+        double vh = sp.getViewportBounds().getHeight();
+        if (vw <= 0 || vh <= 0) return;
+        setScale(Math.min(vw / currentPage.getPageWidthPt(),
+                          vh / currentPage.getPageHeightPt()));
+    }
+
     // ---- Protected accessors for Task 12 mouse logic ----
 
     /**
@@ -386,7 +429,7 @@ public class PdfCanvas extends Canvas {
      * @return coordinate mapper for the current view state
      */
     protected CoordinateMapper mapper() {
-        return new CoordinateMapper(currentPage.getPageHeightPt(), scale);
+        return new CoordinateMapper(currentPage.getPageHeightPt(), scale.get());
     }
 
     /** @return the currently displayed page */
