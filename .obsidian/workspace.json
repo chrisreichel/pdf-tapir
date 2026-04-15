@@ -11,10 +11,14 @@
             "id": "c281fee96d226a40",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "openspec/changes/jpackage-distribution/tasks.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "tasks"
             }
           }
         ]
@@ -90,6 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "openspec/changes/jpackage-distribution/tasks.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -99,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks"
+              "title": "Backlinks for tasks"
             }
           },
           {
@@ -108,11 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "openspec/changes/jpackage-distribution/tasks.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links"
+              "title": "Outgoing links from tasks"
             }
           },
           {
@@ -150,12 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
+                "file": "openspec/changes/jpackage-distribution/tasks.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline"
+              "title": "Outline of tasks"
             }
           }
         ]
@@ -178,17 +185,25 @@
   },
   "active": "c281fee96d226a40",
   "lastOpenFiles": [
-    "target/pdf-escroto-1.0.0-SNAPSHOT.jar",
-    "target/maven-archiver/pom.properties",
-    "target/maven-archiver",
-    "target/surefire-reports/TEST-com.pdfescroto.service.CoordinateMapperTest.xml",
-    "target/surefire-reports/com.pdfescroto.service.CoordinateMapperTest.txt",
-    "target/surefire-reports/TEST-com.pdfescroto.service.PdfRoundTripTest.xml",
-    "target/surefire-reports/com.pdfescroto.service.PdfRoundTripTest.txt",
-    "target/surefire-reports/TEST-com.pdfescroto.service.PdfPageServiceTest.xml",
-    "target/surefire-reports/com.pdfescroto.service.PdfPageServiceTest.txt",
-    "target/surefire-reports/TEST-com.pdfescroto.service.PdfMergeServiceTest.xml",
-    "target/surefire-reports/com.pdfescroto.service.PdfMergeServiceTest.txt",
+    "target/surefire/surefirebooter-20260415084731756_3.jar",
+    "target/surefire/surefire_0-20260415084731756_2tmp",
+    "target/surefire/surefire-20260415084731756_1tmp",
+    "target/surefire",
+    "target/classes/ICON.png",
+    "packaging/icons/ICON.png",
+    "packaging/icons/ICON.ico",
+    "packaging/icons/ICON.icns",
+    "packaging/icons",
+    "packaging",
+    "openspec/changes/jpackage-distribution/tasks.md",
+    "openspec/changes/jpackage-distribution/specs/release-pipeline/spec.md",
+    "openspec/changes/jpackage-distribution/specs/native-installers/spec.md",
+    "openspec/changes/jpackage-distribution/specs/release-pipeline",
+    "openspec/changes/jpackage-distribution/specs/native-installers",
+    "openspec/changes/jpackage-distribution/specs",
+    "openspec/changes/jpackage-distribution/design.md",
+    "openspec/changes/jpackage-distribution/proposal.md",
+    "src/main/resources/ICON.png",
     "openspec/changes/lock-annotations-on-save/tasks.md",
     "openspec/changes/archive/2026-04-15-lock-annotations-on-save/specs/annotation-locking/spec.md",
     "openspec/changes/archive/2026-04-15-lock-annotations-on-save/tasks.md",
@@ -208,11 +223,6 @@
     "openspec/specs/pdf-page-removal/spec.md",
     "openspec/specs/pdf-merge/spec.md",
     "openspec/specs/pdf-encryption/spec.md",
-    "openspec/changes/pdf-operations/specs/pdf-page-removal/spec.md",
-    "openspec/changes/pdf-operations/specs/pdf-merge/spec.md",
-    "openspec/changes/pdf-operations/specs/pdf-encryption/spec.md",
-    "openspec/changes/pdf-operations/design.md",
-    "openspec/changes/pdf-operations/proposal.md",
-    "AGENTS.md"
+    "openspec/changes/pdf-operations/specs/pdf-page-removal/spec.md"
   ]
 }

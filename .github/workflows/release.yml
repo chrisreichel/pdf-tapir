@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            jpackage-type: dmg
+            icon: packaging/icons/ICON.icns
+            artifact-glob: '*.dmg'
+          - os: windows-latest
+            jpackage-type: msi
+            icon: packaging/icons/ICON.ico
+            artifact-glob: '*.msi'
+          - os: ubuntu-latest
+            jpackage-type: deb
+            icon: packaging/icons/ICON.png
+            artifact-glob: '*.deb'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build JAR
+        run: mvn package -DskipTests
+
+      - name: Copy runtime dependencies to target/lib
+        run: mvn dependency:copy-dependencies -DoutputDirectory=target/lib -DincludeScope=runtime
+
+      - name: Copy app JAR into target/lib
+        shell: bash
+        run: cp target/pdf-escroto-${{ env.VERSION }}.jar target/lib/
+
+      - name: Run jpackage
+        shell: bash
+        run: |
+          jpackage \
+            --input target/lib/ \
+            --main-jar pdf-escroto-${{ env.VERSION }}.jar \
+            --main-class com.pdfescroto.PdfEscrotoApp \
+            --name "PDF Escroto" \
+            --app-version ${{ env.VERSION }} \
+            --icon ${{ matrix.icon }} \
+            --type ${{ matrix.jpackage-type }} \
+            --dest target/installer/
+
+      - name: Upload installer to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/installer/${{ matrix.artifact-glob }}
+          draft: false
+          prerelease: false
