@@ -3,3 +3,6 @@ target/
 *.jar
 .DS_Store
 .superpowers/
+.claude/
+.gemini/
+.codex/
