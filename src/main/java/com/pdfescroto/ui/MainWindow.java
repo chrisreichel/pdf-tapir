@@ -15,14 +15,14 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import java.io.File;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Root UI controller that owns the primary {@link Stage} and assembles the
  * full application layout: menu bar, editor toolbar, scrollable canvas, and
  * properties panel.
- * <p>
- * The window is intentionally lazy: the toolbar and canvas are not created
- * until a PDF is successfully opened via {@link #attachDocument()}.
  */
 public class MainWindow {
 
@@ -38,10 +38,12 @@ public class MainWindow {
     private ScrollPane      scrollPane;
 
     /**
-     * Creates the main window and wires all permanent UI components.
-     *
-     * @param primaryStage the primary stage provided by the JavaFX runtime
+     * Tracks files for which the user has already decided their save intent
+     * (overwrite or save-as-new) in the current session. Once a target is in
+     * this set, subsequent saves skip the dialog.
      */
+    private final Set<File> saveIntentDecided = new HashSet<>();
+
     public MainWindow(Stage primaryStage) {
         this.primaryStage = primaryStage;
         buildUI();
@@ -119,23 +121,27 @@ public class MainWindow {
         task.setOnSucceeded(e -> {
             if (openDocument != null) { try { openDocument.close(); } catch (Exception ex) { /* ignore */ } }
             openDocument = task.getValue();
+            saveIntentDecided.clear(); // new document — reset session save-intent state
             attachDocument();
         });
         task.setOnFailed(e -> showError("Failed to open PDF", task.getException()));
         new Thread(task, "pdf-loader").start();
     }
 
-    /**
-     * Called after a PDF is successfully loaded. Constructs the {@link EditorToolBar}
-     * and {@link PdfCanvas}, then assembles them into the {@link BorderPane}.
-     */
     private void attachDocument() {
         var toolbar = new EditorToolBar(openDocument, undoManager);
         canvas      = new PdfCanvas(openDocument, undoManager, propertiesPanel);
         toolbar.bindCanvas(canvas);
 
-        scrollPane = new ScrollPane(canvas);
-        scrollPane.setPannable(true);
+        var overlayPane = new javafx.scene.layout.Pane();
+        overlayPane.setPickOnBounds(false);
+        canvas.setOverlayPane(overlayPane);
+
+        var contentPane = new javafx.scene.layout.StackPane(canvas, overlayPane);
+        contentPane.setAlignment(javafx.geometry.Pos.TOP_LEFT);
+
+        scrollPane = new ScrollPane(contentPane);
+        scrollPane.setPannable(false);
 
         root.setTop(new VBox(buildMenuBar(), toolbar.getNode()));
         root.setCenter(scrollPane);
@@ -144,7 +150,9 @@ public class MainWindow {
     private void saveFile(boolean saveAs) {
         if (openDocument == null) return;
         File target = openDocument.getSourceFile();
+
         if (saveAs || target == null) {
+            // "Save As…" or new (unsaved) document: always show file chooser directly
             var chooser = new FileChooser();
             chooser.setTitle("Save PDF As");
             chooser.getExtensionFilters().add(
@@ -152,7 +160,37 @@ public class MainWindow {
             target = chooser.showSaveDialog(primaryStage);
             if (target == null) return;
             openDocument.setSourceFile(target);
+            saveIntentDecided.add(target);
+
+        } else if (!saveIntentDecided.contains(target)) {
+            // First plain Save for this opened file: ask whether to overwrite or save as new
+            var overwriteBtn = new ButtonType("Overwrite original");
+            var saveAsNewBtn = new ButtonType("Save as new file");
+            var alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Save");
+            alert.setHeaderText("How would you like to save?");
+            alert.setContentText("\"" + target.getName() + "\" was opened from disk.");
+            alert.getButtonTypes().setAll(overwriteBtn, saveAsNewBtn, ButtonType.CANCEL);
+
+            Optional<ButtonType> result = alert.showAndWait();
+            if (result.isEmpty() || result.get() == ButtonType.CANCEL) return;
+
+            if (result.get() == saveAsNewBtn) {
+                var chooser = new FileChooser();
+                chooser.setTitle("Save PDF As");
+                chooser.getExtensionFilters().add(
+                        new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+                File newTarget = chooser.showSaveDialog(primaryStage);
+                if (newTarget == null) return;
+                openDocument.setSourceFile(newTarget);
+                saveIntentDecided.add(newTarget);
+                target = newTarget;
+            } else {
+                // "Overwrite original"
+                saveIntentDecided.add(target);
+            }
         }
+        // else: intent already decided this session — save silently
 
         final File finalTarget = target;
         var task = new Task<Void>() {
@@ -174,10 +212,5 @@ public class MainWindow {
         });
     }
 
-    /**
-     * Returns the root layout node to be placed in the JavaFX {@link javafx.scene.Scene}.
-     *
-     * @return the root {@link BorderPane}
-     */
     public BorderPane getRoot() { return root; }
 }

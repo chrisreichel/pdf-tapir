@@ -4,8 +4,9 @@ package com.pdfescroto.model;
  * An annotation that renders a labelled checkbox on a PDF page.
  */
 public class CheckboxAnnotation extends Annotation {
-    private String  label   = "";
-    private boolean checked = false;
+    private String  label          = "";
+    private boolean checked        = false;
+    private String  checkmarkColor = "#000000";
 
     /**
      * Creates a CheckboxAnnotation with the given bounding rectangle.
@@ -30,4 +31,10 @@ public class CheckboxAnnotation extends Annotation {
 
     /** Sets the checked state of the checkbox. */
     public void    setChecked(boolean c) { this.checked = c; }
+
+    /** Returns the checkmark color as a CSS hex string (e.g. {@code "#000000"}). */
+    public String  getCheckmarkColor()         { return checkmarkColor; }
+
+    /** Sets the checkmark color as a CSS hex string (e.g. {@code "#000000"}). */
+    public void    setCheckmarkColor(String c) { this.checkmarkColor = c; }
 }

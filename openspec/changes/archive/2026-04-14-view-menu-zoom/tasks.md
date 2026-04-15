@@ -27,7 +27,7 @@
 ## 4. Verify
 
 - [x] 4.1 Run `mvn test` — all 16 tests pass
-- [ ] 4.2 Launch app (`mvn javafx:run`), open a PDF, verify Zoom In/Out changes canvas size and toolbar label updates
-- [ ] 4.3 Verify Fit Page scales the page to fill the visible area
-- [ ] 4.4 Verify zoom cannot go below 25% or above 400%
+- [x] 4.2 Launch app (`mvn javafx:run`), open a PDF, verify Zoom In/Out changes canvas size and toolbar label updates
+- [x] 4.3 Verify Fit Page scales the page to fill the visible area
+- [x] 4.4 Verify zoom cannot go below 25% or above 400%
 - [x] 4.5 Commit: `feat: add zoom in/out/fit-page to View menu`

@@ -1,24 +1,28 @@
 package com.pdfescroto.ui;
 
 import com.pdfescroto.command.DeleteAnnotationCommand;
+import com.pdfescroto.command.EditAnnotationCommand;
 import com.pdfescroto.command.UndoManager;
 import com.pdfescroto.model.*;
 import com.pdfescroto.service.CoordinateMapper;
+import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 
 /**
  * Canvas that renders the current PDF page image and overlays interactive
  * annotation handles for the select, text, checkbox, and image tools.
- *
- * <p>Mouse interaction is wired in Task 12 by overriding the protected
- * {@code onMousePressed}, {@code onMouseDragged}, and {@code onMouseReleased}
- * hooks. This class handles rendering only.</p>
  */
 public class PdfCanvas extends Canvas {
 
@@ -29,30 +33,27 @@ public class PdfCanvas extends Canvas {
     private PdfPage    currentPage;
     private int        currentPageIndex    = 0;
     private final DoubleProperty scale = new SimpleDoubleProperty(1.0);
-    private Tool       activeTool          = Tool.SELECT;
+    private final ObjectProperty<Tool> activeTool = new SimpleObjectProperty<>(Tool.SELECT);
     private Annotation selectedAnnotation;
 
-    // Drag/create state (used in Task 12)
+    // Drag/create state
     private boolean    isDragging;
     private double     dragStartX, dragStartY;
     private double     annotStartX, annotStartY;
     private boolean    isCreating;
     private double     createStartX, createStartY;
     private Annotation creatingAnnotation;
-    private String     resizeHandle;          // "NW","NE","SW","SE" or null
-    private double     oldAnnotW, oldAnnotH;  // old size at resize start
+    private String     resizeHandle;
+    private double     oldAnnotW, oldAnnotH;
+
+    // Inline text editor support
+    private Pane             overlayPane;
+    private TextAnnotation   activeInlineAnnotation;
+    private Runnable         commitInlineEditor;
 
     /** Side length of each corner selection handle square, in canvas pixels. */
     protected static final double HANDLE_SIZE = 8.0;
 
-    /**
-     * Creates the canvas for the given document, wired to the shared undo manager
-     * and the properties panel that should be updated on selection changes.
-     *
-     * @param document the currently open PDF document
-     * @param undoManager the shared undo/redo manager
-     * @param propertiesPanel the properties panel to notify when an annotation is selected
-     */
     public PdfCanvas(PdfDocument document, UndoManager undoManager, PropertiesPanel propertiesPanel) {
         super(800, 1000);
         this.document        = document;
@@ -64,11 +65,6 @@ public class PdfCanvas extends Canvas {
 
     // ---- Page navigation ----
 
-    /**
-     * Navigates to the specified page, resets the selection, and redraws.
-     *
-     * @param index the zero-based page index; out-of-range values are ignored
-     */
     public void goToPage(int index) {
         if (index < 0 || index >= document.getPages().size()) return;
         currentPageIndex   = index;
@@ -87,26 +83,19 @@ public class PdfCanvas extends Canvas {
 
     // ---- Rendering ----
 
-    /**
-     * Clears the canvas and repaints the current page image together with all
-     * annotation overlays and (if applicable) the in-progress creation ghost.
-     */
     public void redraw() {
         if (currentPage == null) return;
         GraphicsContext gc = getGraphicsContext2D();
         gc.clearRect(0, 0, getWidth(), getHeight());
 
-        // Draw PDF page image
         var img = currentPage.getRenderedImage();
         if (img != null) gc.drawImage(img, 0, 0, getWidth(), getHeight());
 
-        // Draw annotations
         var mapper = mapper();
         for (var annotation : currentPage.getAnnotations()) {
             drawAnnotation(gc, annotation, mapper, annotation == selectedAnnotation);
         }
 
-        // Draw in-progress creation overlay
         if (isCreating && creatingAnnotation != null) {
             drawAnnotation(gc, creatingAnnotation, mapper, false);
         }
@@ -125,23 +114,33 @@ public class PdfCanvas extends Canvas {
             gc.setStroke(selected ? Color.DODGERBLUE : Color.rgb(74, 123, 189, 0.8));
             gc.setLineWidth(selected ? 2.0 : 1.0);
             gc.strokeRect(cx, cy, cw, ch);
-            gc.setFill(Color.BLACK);
-            gc.setFont(Font.font(ta.getFontSize() * scale.get()));
-            gc.fillText(ta.getText(), cx + 3, cy + ta.getFontSize() * scale.get(), cw - 6);
+            // Skip text rendering when inline editor is active for this annotation
+            if (ta != activeInlineAnnotation) {
+                gc.setFill(Color.web(ta.getFontColor()));
+                gc.setFont(Font.font(ta.getFontFamily(), ta.getFontSize() * scale.get()));
+                gc.fillText(ta.getText(), cx + 3, cy + ta.getFontSize() * scale.get(), cw - 6);
+            }
 
         } else if (a instanceof CheckboxAnnotation ca) {
             gc.setStroke(selected ? Color.DODGERBLUE : Color.rgb(46, 125, 50, 0.9));
             gc.setLineWidth(selected ? 2.0 : 1.5);
             gc.strokeRect(cx, cy, cw, ch);
             if (ca.isChecked()) {
-                gc.setStroke(Color.rgb(46, 125, 50));
+                gc.setStroke(Color.web(ca.getCheckmarkColor()));
                 gc.setLineWidth(2.0);
-                // Draw a checkmark inside
                 gc.strokeLine(cx + 3, cy + ch * 0.55, cx + cw * 0.4, cy + ch - 3);
                 gc.strokeLine(cx + cw * 0.4, cy + ch - 3, cx + cw - 3, cy + 3);
             }
 
         } else if (a instanceof ImageAnnotation ia) {
+            // Lazy-init fxImage from imageData if not yet set (e.g. after PDF reload where
+            // the background-thread Image constructor failed or was skipped).
+            if (ia.getFxImage() == null && ia.getImageData() != null && ia.getImageData().length > 0) {
+                try {
+                    ia.setFxImage(new javafx.scene.image.Image(
+                            new java.io.ByteArrayInputStream(ia.getImageData())));
+                } catch (Exception ignored) {}
+            }
             if (ia.getFxImage() != null) {
                 gc.drawImage(ia.getFxImage(), cx, cy, cw, ch);
             } else {
@@ -165,29 +164,44 @@ public class PdfCanvas extends Canvas {
         gc.fillRect(cx + cw - h / 2, cy + ch - h / 2, h, h);
     }
 
-    // ---- Mouse handler setup (overridden in Task 12) ----
+    // ---- Mouse handler setup ----
 
     private void setupMouseHandlers() {
-        setOnMousePressed(e  -> onMousePressed(e.getX(),  e.getY(),  e.isPrimaryButtonDown()));
-        setOnMouseDragged(e  -> onMouseDragged(e.getX(),  e.getY()));
-        setOnMouseReleased(e -> onMouseReleased(e.getX(), e.getY()));
+        setOnMousePressed(e -> {
+            onMousePressed(e.getX(), e.getY(), e.isPrimaryButtonDown());
+            // Consume if annotation drag started — prevents ScrollPane from also panning
+            if (isDragging || resizeHandle != null) e.consume();
+        });
+        setOnMouseDragged(e -> {
+            onMouseDragged(e.getX(), e.getY());
+            if (isDragging || resizeHandle != null) e.consume();
+        });
+        setOnMouseReleased(e -> {
+            boolean wasActive = isDragging || resizeHandle != null;
+            onMouseReleased(e.getX(), e.getY());
+            if (wasActive) e.consume();
+        });
+        // Double-click opens inline text editor for existing text annotations
+        setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2 && e.getButton() == MouseButton.PRIMARY) {
+                onDoubleClick(e.getX(), e.getY());
+            }
+        });
+        // Shift + scroll wheel zooms; plain scroll falls through to ScrollPane
+        setOnScroll(e -> {
+            if (e.isShiftDown()) {
+                if (e.getDeltaY() > 0) zoomIn();
+                else if (e.getDeltaY() < 0) zoomOut();
+                e.consume();
+            }
+        });
     }
 
-    /**
-     * Invoked when a mouse button is pressed on the canvas.
-     * In SELECT mode, performs a hit test against annotations and begins a drag move.
-     * In creation modes, records the PDF-space start point and creates a zero-size ghost.
-     *
-     * @param cx      canvas X coordinate of the press
-     * @param cy      canvas Y coordinate of the press
-     * @param primary {@code true} if the primary (left) mouse button is down
-     */
     protected void onMousePressed(double cx, double cy, boolean primary) {
         if (!primary || currentPage == null) return;
         var mapper = mapper();
 
         if (getActiveTool() == Tool.SELECT) {
-            // Check if clicking a resize handle of the selected annotation
             if (getSelectedAnnotation() != null) {
                 String handle = hitTestHandle(cx, cy, getSelectedAnnotation(), mapper);
                 if (handle != null) {
@@ -202,7 +216,6 @@ public class PdfCanvas extends Canvas {
             }
             resizeHandle = null;
 
-            // Hit test annotations in reverse order (top-most first)
             var annotations = currentPage.getAnnotations();
             Annotation hit = null;
             for (int i = annotations.size() - 1; i >= 0; i--) {
@@ -220,7 +233,6 @@ public class PdfCanvas extends Canvas {
             redraw();
 
         } else {
-            // Creation tools: record start in PDF coords
             double pdfX = mapper.canvasXToPdf(cx);
             double pdfY = mapper.canvasYToPdf(cy);
             setCreateStart(pdfX, pdfY);
@@ -231,31 +243,21 @@ public class PdfCanvas extends Canvas {
         }
     }
 
-    /**
-     * Invoked while the mouse is dragged across the canvas.
-     * In SELECT mode with an active drag, moves the selected annotation.
-     * In creation mode, resizes the ghost annotation to match the current mouse position.
-     *
-     * @param cx canvas X coordinate
-     * @param cy canvas Y coordinate
-     */
     protected void onMouseDragged(double cx, double cy) {
         if (currentPage == null) return;
         var mapper = mapper();
 
-        // Resize via handle drag
         if (getActiveTool() == Tool.SELECT && resizeHandle != null && getSelectedAnnotation() != null) {
             var ann    = getSelectedAnnotation();
             double pdfX = mapper.canvasXToPdf(cx);
             double pdfY = mapper.canvasYToPdf(cy);
             double x = ann.getX(), y = ann.getY(), w = ann.getWidth(), h = ann.getHeight();
-            // Compute fixed corner (the corner opposite the dragged handle) in PDF space
             double fixedPdfX, fixedPdfY;
             switch (resizeHandle) {
-                case "SE" -> { fixedPdfX = x;     fixedPdfY = y + h; } // drag SE → fixed NW (PDF top-left)
-                case "NW" -> { fixedPdfX = x + w; fixedPdfY = y;     } // drag NW → fixed SE (PDF bottom-right)
-                case "NE" -> { fixedPdfX = x;     fixedPdfY = y;     } // drag NE → fixed SW (PDF bottom-left)
-                case "SW" -> { fixedPdfX = x + w; fixedPdfY = y + h; } // drag SW → fixed NE (PDF top-right)
+                case "SE" -> { fixedPdfX = x;     fixedPdfY = y + h; }
+                case "NW" -> { fixedPdfX = x + w; fixedPdfY = y;     }
+                case "NE" -> { fixedPdfX = x;     fixedPdfY = y;     }
+                case "SW" -> { fixedPdfX = x + w; fixedPdfY = y + h; }
                 default   -> { return; }
             }
             double newX = Math.min(fixedPdfX, pdfX);
@@ -272,9 +274,8 @@ public class PdfCanvas extends Canvas {
         }
 
         if (getActiveTool() == Tool.SELECT && getIsDragging() && getSelectedAnnotation() != null) {
-            // Move: translate PDF coords by delta
             double dx =  mapper.canvasDimToPdf(cx - getDragStartX());
-            double dy = -mapper.canvasDimToPdf(cy - getDragStartY()); // Y axis flip
+            double dy = -mapper.canvasDimToPdf(cy - getDragStartY());
             var ann = getSelectedAnnotation();
             ann.setX(getAnnotStartX() + dx);
             ann.setY(getAnnotStartY() + dy);
@@ -282,7 +283,6 @@ public class PdfCanvas extends Canvas {
             redraw();
 
         } else if (isCreating() && getCreatingAnnotation() != null) {
-            // Resize creation ghost from start corner to current mouse position
             double pdfX = mapper.canvasXToPdf(cx);
             double pdfY = mapper.canvasYToPdf(cy);
             double x = Math.min(getCreateStartX(), pdfX);
@@ -290,30 +290,19 @@ public class PdfCanvas extends Canvas {
             double w = Math.abs(pdfX - getCreateStartX());
             double h = Math.abs(pdfY - getCreateStartY());
             var ann = getCreatingAnnotation();
-            // Bypass the constructor guard — allow zero during drag
             ann.setX(x); ann.setY(y); ann.setWidth(w); ann.setHeight(h);
             redraw();
         }
     }
 
-    /**
-     * Invoked when a mouse button is released on the canvas.
-     * In SELECT mode, commits a completed drag as an undoable command.
-     * In creation mode, commits the new annotation if its size exceeds a minimum threshold.
-     *
-     * @param cx canvas X coordinate of the release
-     * @param cy canvas Y coordinate of the release
-     */
     protected void onMouseReleased(double cx, double cy) {
         if (currentPage == null) return;
 
-        // Commit resize
         if (getActiveTool() == Tool.SELECT && resizeHandle != null && getSelectedAnnotation() != null) {
             var ann    = getSelectedAnnotation();
             double finalX = ann.getX(), finalY = ann.getY();
             double finalW = ann.getWidth(), finalH = ann.getHeight();
             double startX = getAnnotStartX(), startY = getAnnotStartY();
-            // Reset to original so ResizeAnnotationCommand.execute() applies the resize correctly
             ann.setX(startX); ann.setY(startY);
             ann.setWidth(oldAnnotW); ann.setHeight(oldAnnotH);
             getUndoManager().execute(new com.pdfescroto.command.ResizeAnnotationCommand(
@@ -325,14 +314,12 @@ public class PdfCanvas extends Canvas {
         }
 
         if (getActiveTool() == Tool.SELECT && getIsDragging() && getSelectedAnnotation() != null) {
-            // Commit move as undoable command (only if the annotation actually moved)
             var ann   = getSelectedAnnotation();
             double finalX = ann.getX();
             double finalY = ann.getY();
             double oldX   = getAnnotStartX();
             double oldY   = getAnnotStartY();
             if (Math.abs(finalX - oldX) > 0.5 || Math.abs(finalY - oldY) > 0.5) {
-                // Reset to old position so MoveAnnotationCommand.execute() applies the move correctly
                 ann.setX(oldX);
                 ann.setY(oldY);
                 getUndoManager().execute(new com.pdfescroto.command.MoveAnnotationCommand(
@@ -343,15 +330,21 @@ public class PdfCanvas extends Canvas {
 
         } else if (isCreating() && getCreatingAnnotation() != null) {
             var ann = getCreatingAnnotation();
-            // Only commit if the annotation has meaningful size (not a stray click)
             if (ann.getWidth() > 2 && ann.getHeight() > 2) {
                 getUndoManager().execute(
                         new com.pdfescroto.command.AddAnnotationCommand(getCurrentPage(), ann));
                 setSelectedAnnotation(ann);
 
-                // For image annotations: prompt file chooser after creation
                 if (getActiveTool() == Tool.IMAGE) {
                     promptImageFile((ImageAnnotation) ann);
+                } else {
+                    // TEXT or CHECKBOX: open inline editor (for text) or switch to select
+                    if (ann instanceof TextAnnotation ta) {
+                        setActiveTool(Tool.SELECT);
+                        showInlineTextEditor(ta);
+                    } else {
+                        setActiveTool(Tool.SELECT);
+                    }
                 }
             }
             setCreating(false);
@@ -360,12 +353,85 @@ public class PdfCanvas extends Canvas {
         }
     }
 
+    private void onDoubleClick(double cx, double cy) {
+        if (getActiveTool() != Tool.SELECT || currentPage == null) return;
+        var mapper = mapper();
+        for (int i = currentPage.getAnnotations().size() - 1; i >= 0; i--) {
+            var ann = currentPage.getAnnotations().get(i);
+            if (ann instanceof TextAnnotation ta && hitTest(ann, cx, cy, mapper)) {
+                showInlineTextEditor(ta);
+                return;
+            }
+        }
+    }
+
+    // ---- Inline text editor ----
+
+    public void setOverlayPane(Pane pane) { this.overlayPane = pane; }
+
+    private void showInlineTextEditor(TextAnnotation ta) {
+        if (overlayPane == null) return;
+        // Commit any previously open editor first
+        if (commitInlineEditor != null) commitInlineEditor.run();
+
+        activeInlineAnnotation = ta;
+        redraw();
+
+        var mapper = mapper();
+        double edX = mapper.pdfXToCanvas(ta.getX());
+        double edY = mapper.pdfYToCanvasTop(ta.getY(), ta.getHeight());
+        double edW = mapper.pdfDimToCanvas(ta.getWidth());
+        double edH = mapper.pdfDimToCanvas(ta.getHeight());
+
+        var textArea = new TextArea(ta.getText());
+        textArea.setLayoutX(edX);
+        textArea.setLayoutY(edY);
+        textArea.setPrefWidth(edW);
+        textArea.setPrefHeight(edH);
+        textArea.setWrapText(true);
+
+        final String oldText = ta.getText();
+        final boolean[] committed = {false};
+
+        Runnable commit = () -> {
+            if (committed[0]) return;
+            committed[0] = true;
+            String newText = textArea.getText();
+            overlayPane.getChildren().remove(textArea);
+            activeInlineAnnotation = null;
+            commitInlineEditor = null;
+            if (!oldText.equals(newText)) {
+                undoManager.execute(new EditAnnotationCommand(
+                    () -> { ta.setText(newText); propertiesPanel.showAnnotation(ta); redraw(); },
+                    () -> { ta.setText(oldText); propertiesPanel.showAnnotation(ta); redraw(); }
+                ));
+            } else {
+                redraw();
+            }
+        };
+
+        commitInlineEditor = commit;
+
+        textArea.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) {
+                commit.run();
+                e.consume();
+            } else if (e.getCode() == KeyCode.ENTER && !e.isShiftDown()) {
+                commit.run();
+                e.consume();
+            }
+        });
+
+        textArea.focusedProperty().addListener((obs, was, focused) -> {
+            if (!focused) commit.run();
+        });
+
+        overlayPane.getChildren().add(textArea);
+        Platform.runLater(textArea::requestFocus);
+    }
+
     // ---- Actions ----
 
-    /**
-     * Deletes the currently selected annotation by executing a
-     * {@link DeleteAnnotationCommand} through the undo manager.
-     */
     public void deleteSelected() {
         if (selectedAnnotation == null || currentPage == null) return;
         undoManager.execute(new DeleteAnnotationCommand(currentPage, selectedAnnotation));
@@ -374,44 +440,28 @@ public class PdfCanvas extends Canvas {
         redraw();
     }
 
-    /**
-     * Switches the active editing tool.
-     *
-     * @param tool the tool to activate
-     */
-    public void setActiveTool(Tool tool) { this.activeTool = tool; }
+    public void setActiveTool(Tool tool) { activeTool.set(tool); }
+
+    /** Returns the active tool as an observable property for toolbar synchronization. */
+    public ObjectProperty<Tool> activeToolProperty() { return activeTool; }
 
     // ---- Zoom ----
 
-    /** @return the scale property (1.0 = 100%) */
     public DoubleProperty scaleProperty() { return scale; }
 
-    /** @return the current scale factor */
     public double getScale() { return scale.get(); }
 
-    /**
-     * Sets the canvas scale, clamped to [0.25, 4.0], and redraws.
-     *
-     * @param s the desired scale factor
-     */
     public void setScale(double s) {
+        if (commitInlineEditor != null) commitInlineEditor.run();
         scale.set(Math.max(0.25, Math.min(4.0, s)));
         resizeCanvasToPage();
         redraw();
     }
 
-    /** Increases zoom by a factor of 1.25 (clamped at 400%). */
     public void zoomIn()  { setScale(getScale() * 1.25); }
 
-    /** Decreases zoom by a factor of 1.25 (clamped at 25%). */
     public void zoomOut() { setScale(getScale() / 1.25); }
 
-    /**
-     * Scales the canvas so the current page fits within the visible viewport of
-     * the given {@link ScrollPane}, choosing the smaller of width-fit and height-fit.
-     *
-     * @param sp the scroll pane whose viewport defines the available space
-     */
     public void fitPage(ScrollPane sp) {
         if (currentPage == null) return;
         double vw = sp.getViewportBounds().getWidth();
@@ -421,126 +471,41 @@ public class PdfCanvas extends Canvas {
                           vh / currentPage.getPageHeightPt()));
     }
 
-    // ---- Protected accessors for Task 12 mouse logic ----
+    // ---- Protected accessors ----
 
-    /**
-     * Returns a {@link CoordinateMapper} calibrated to the current page and scale.
-     *
-     * @return coordinate mapper for the current view state
-     */
     protected CoordinateMapper mapper() {
         return new CoordinateMapper(currentPage.getPageHeightPt(), scale.get());
     }
 
-    /** @return the currently displayed page */
     protected PdfPage       getCurrentPage()            { return currentPage; }
-
-    /** @return the currently active tool */
-    protected Tool          getActiveTool()             { return activeTool; }
-
-    /** @return the currently selected annotation, or {@code null} */
+    protected Tool          getActiveTool()             { return activeTool.get(); }
     protected Annotation    getSelectedAnnotation()     { return selectedAnnotation; }
 
-    /**
-     * Selects the given annotation and notifies the properties panel.
-     *
-     * @param a the annotation to select, or {@code null} to clear selection
-     */
-    protected void          setSelectedAnnotation(Annotation a) {
+    protected void setSelectedAnnotation(Annotation a) {
         selectedAnnotation = a;
         propertiesPanel.showAnnotation(a);
     }
 
-    /** @return the shared undo manager */
-    protected UndoManager   getUndoManager()            { return undoManager; }
-
-    /** @return the properties panel wired to this canvas */
+    protected UndoManager    getUndoManager()           { return undoManager; }
     protected PropertiesPanel getPropertiesPanel()      { return propertiesPanel; }
-
-    /** @return {@code true} if an annotation is currently being drawn */
-    protected boolean       isCreating()                { return isCreating; }
-
-    /**
-     * Sets the in-progress creation flag.
-     *
-     * @param b {@code true} while drawing a new annotation
-     */
-    protected void          setCreating(boolean b)      { isCreating = b; }
-
-    /** @return the canvas X coordinate where the current drag began */
-    protected double        getDragStartX()             { return dragStartX; }
-
-    /** @return the canvas Y coordinate where the current drag began */
-    protected double        getDragStartY()             { return dragStartY; }
-
-    /** @return the PDF X coordinate of the annotation at drag start */
-    protected double        getAnnotStartX()            { return annotStartX; }
-
-    /** @return the PDF Y coordinate of the annotation at drag start */
-    protected double        getAnnotStartY()            { return annotStartY; }
-
-    /** @return the canvas X coordinate where the current creation drag began */
-    protected double        getCreateStartX()           { return createStartX; }
-
-    /** @return the canvas Y coordinate where the current creation drag began */
-    protected double        getCreateStartY()           { return createStartY; }
-
-    /** @return the annotation being drawn, or {@code null} */
-    protected Annotation    getCreatingAnnotation()     { return creatingAnnotation; }
-
-    /**
-     * Records the canvas coordinates where the current drag started.
-     *
-     * @param x canvas X
-     * @param y canvas Y
-     */
-    protected void          setDragStart(double x, double y)    { dragStartX = x; dragStartY = y; }
-
-    /**
-     * Records the PDF-space position of the annotation at the start of a drag.
-     *
-     * @param x PDF X
-     * @param y PDF Y
-     */
-    protected void          setAnnotStart(double x, double y)   { annotStartX = x; annotStartY = y; }
-
-    /**
-     * Records the canvas coordinates where the current creation drag started.
-     *
-     * @param x canvas X
-     * @param y canvas Y
-     */
-    protected void          setCreateStart(double x, double y)  { createStartX = x; createStartY = y; }
-
-    /**
-     * Sets the annotation instance being drawn during a creation drag.
-     *
-     * @param a the partially constructed annotation
-     */
-    protected void          setCreatingAnnotation(Annotation a) { creatingAnnotation = a; }
-
-    /**
-     * Sets the drag-in-progress flag.
-     *
-     * @param b {@code true} while a drag move is active
-     */
-    protected void          setIsDragging(boolean b)            { isDragging = b; }
-
-    /** @return {@code true} while a drag move is active */
-    protected boolean       getIsDragging()                     { return isDragging; }
+    protected boolean        isCreating()               { return isCreating; }
+    protected void           setCreating(boolean b)     { isCreating = b; }
+    protected double         getDragStartX()            { return dragStartX; }
+    protected double         getDragStartY()            { return dragStartY; }
+    protected double         getAnnotStartX()           { return annotStartX; }
+    protected double         getAnnotStartY()           { return annotStartY; }
+    protected double         getCreateStartX()          { return createStartX; }
+    protected double         getCreateStartY()          { return createStartY; }
+    protected Annotation     getCreatingAnnotation()    { return creatingAnnotation; }
+    protected void           setDragStart(double x, double y)    { dragStartX = x; dragStartY = y; }
+    protected void           setAnnotStart(double x, double y)   { annotStartX = x; annotStartY = y; }
+    protected void           setCreateStart(double x, double y)  { createStartX = x; createStartY = y; }
+    protected void           setCreatingAnnotation(Annotation a) { creatingAnnotation = a; }
+    protected void           setIsDragging(boolean b)            { isDragging = b; }
+    protected boolean        getIsDragging()                     { return isDragging; }
 
     // ---- Private helpers ----
 
-    /**
-     * Returns {@code true} if the canvas point (cx, cy) falls within the bounding box
-     * of the given annotation.
-     *
-     * @param a      the annotation to test
-     * @param cx     canvas X coordinate of the point to test
-     * @param cy     canvas Y coordinate of the point to test
-     * @param mapper the coordinate mapper for the current view state
-     * @return {@code true} if the point is inside the annotation bounds
-     */
     private boolean hitTest(Annotation a, double cx, double cy, CoordinateMapper mapper) {
         double ax = mapper.pdfXToCanvas(a.getX());
         double ay = mapper.pdfYToCanvasTop(a.getY(), a.getHeight());
@@ -549,17 +514,6 @@ public class PdfCanvas extends Canvas {
         return cx >= ax && cx <= ax + aw && cy >= ay && cy <= ay + ah;
     }
 
-    /**
-     * Creates a new annotation of the type corresponding to the current active tool,
-     * positioned at the given PDF coordinates with the given dimensions.
-     *
-     * @param pdfX PDF X coordinate (points)
-     * @param pdfY PDF Y coordinate (points)
-     * @param w    width in PDF points
-     * @param h    height in PDF points
-     * @return a new annotation instance for the active creation tool
-     * @throws IllegalStateException if the active tool is not a creation tool
-     */
     private Annotation createAnnotation(double pdfX, double pdfY, double w, double h) {
         return switch (getActiveTool()) {
             case TEXT     -> new TextAnnotation(pdfX, pdfY, w, h);
@@ -569,16 +523,6 @@ public class PdfCanvas extends Canvas {
         };
     }
 
-    /**
-     * Returns the handle name ("NW", "NE", "SW", "SE") if (cx,cy) is within HANDLE_SIZE
-     * pixels of a corner handle of annotation {@code a}, or {@code null} if no handle hit.
-     *
-     * @param cx     canvas X coordinate of the test point
-     * @param cy     canvas Y coordinate of the test point
-     * @param a      the annotation whose handles to test
-     * @param mapper the coordinate mapper for the current view state
-     * @return handle name, or {@code null} if no handle was hit
-     */
     private String hitTestHandle(double cx, double cy, Annotation a, CoordinateMapper mapper) {
         double ax = mapper.pdfXToCanvas(a.getX());
         double ay = mapper.pdfYToCanvasTop(a.getY(), a.getHeight());
@@ -591,32 +535,18 @@ public class PdfCanvas extends Canvas {
         return null;
     }
 
-    /**
-     * Returns {@code true} if canvas point (cx, cy) is within HANDLE_SIZE pixels
-     * of the handle anchor (hx, hy).
-     *
-     * @param cx canvas X of the test point
-     * @param hx canvas X of the handle centre
-     * @param cy canvas Y of the test point
-     * @param hy canvas Y of the handle centre
-     * @return {@code true} if within tolerance
-     */
     private boolean near(double cx, double hx, double cy, double hy) {
         return Math.abs(cx - hx) < HANDLE_SIZE && Math.abs(cy - hy) < HANDLE_SIZE;
     }
 
-    /**
-     * Opens a file chooser to let the user select an image file and loads its data
-     * into the given {@link ImageAnnotation}. Displays an error alert on failure.
-     *
-     * @param ia the image annotation to populate with the chosen file
-     */
     private void promptImageFile(ImageAnnotation ia) {
         var chooser = new javafx.stage.FileChooser();
         chooser.setTitle("Choose Image");
         chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(
                 "Images", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp"));
         var file = chooser.showOpenDialog(getScene().getWindow());
+        // Always switch to SELECT after the dialog closes (whether file chosen or cancelled)
+        setActiveTool(Tool.SELECT);
         if (file == null) return;
         try {
             ia.setImageData(java.nio.file.Files.readAllBytes(file.toPath()));

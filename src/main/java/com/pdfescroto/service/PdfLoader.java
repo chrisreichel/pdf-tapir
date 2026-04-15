@@ -4,10 +4,15 @@ import com.pdfescroto.model.*;
 import org.apache.pdfbox.cos.COSDictionary;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.Loader;
+import java.util.Base64;
 import org.apache.pdfbox.pdmodel.*;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.interactive.annotation.*;
 import org.apache.pdfbox.pdmodel.interactive.form.*;
 
+import javax.imageio.ImageIO;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -79,13 +84,18 @@ public class PdfLoader {
                         rect.getLowerLeftX(), rect.getLowerLeftY(),
                         rect.getWidth(), rect.getHeight());
                 ta.setText(freeText.getContents() != null ? freeText.getContents() : "");
-                // Recover font size from title popup field (/T), where writeText stored "fs=<size>"
+                // Recover font metadata from /T field: "fs=<size>;fc=<color>;ff=<family>"
                 String titleBar = freeText.getTitlePopup();
-                if (titleBar != null && titleBar.startsWith("fs=")) {
-                    try {
-                        ta.setFontSize(Float.parseFloat(titleBar.substring(3)));
-                    } catch (NumberFormatException ignored) {
-                        // malformed title bar — keep default fontSize
+                if (titleBar != null) {
+                    for (String part : titleBar.split(";")) {
+                        if (part.startsWith("fs=")) {
+                            try { ta.setFontSize(Float.parseFloat(part.substring(3))); }
+                            catch (NumberFormatException ignored) {}
+                        } else if (part.startsWith("fc=")) {
+                            ta.setFontColor(part.substring(3));
+                        } else if (part.startsWith("ff=")) {
+                            ta.setFontFamily(part.substring(3));
+                        }
                     }
                 }
                 return Optional.of(ta);
@@ -106,9 +116,11 @@ public class PdfLoader {
         // Image annotation: PDAnnotationRubberStamp with subject TAG_IMAGE
         if (pdAnnotation instanceof PDAnnotationRubberStamp stamp) {
             if (PdfSaver.TAG_IMAGE.equals(stamp.getSubject())) {
-                return Optional.of(new ImageAnnotation(
+                var ia = new ImageAnnotation(
                         rect.getLowerLeftX(), rect.getLowerLeftY(),
-                        rect.getWidth(), rect.getHeight()));
+                        rect.getWidth(), rect.getHeight());
+                restoreImageData(stamp, ia);
+                return Optional.of(ia);
             }
         }
 
@@ -129,14 +141,31 @@ public class PdfLoader {
     private void reconstructCheckboxField(PDDocument pdDoc,
                                           PDAnnotationWidget widget,
                                           CheckboxAnnotation ca) {
+        // Primary path: parse the structured metadata string from widget /Contents.
+        // Format (new): "cc=<color>;chk=<true|false>;lbl=<label>"
+        String contents = widget.getContents();
+        boolean hasChkField = false;
+        if (contents != null) {
+            for (String part : contents.split(";")) {
+                if (part.startsWith("cc=")) {
+                    ca.setCheckmarkColor(part.substring(3));
+                } else if (part.startsWith("chk=")) {
+                    ca.setChecked(Boolean.parseBoolean(part.substring(4)));
+                    hasChkField = true;
+                } else if (part.startsWith("lbl=")) {
+                    ca.setLabel(decodeLbl(part.substring(4)));
+                }
+            }
+        }
+
+        if (hasChkField) return; // all metadata recovered — skip AcroForm reconstruction
+
+        // Fallback: AcroForm reconstruction for PDFs saved before the new encoding.
+        // Also handles the old single-field "cc=..." format (no chk/lbl keys).
         var acroForm = pdDoc.getDocumentCatalog().getAcroForm();
         if (acroForm == null) return;
 
-        // First try: the widget COS dict may itself be the merged field dict.
-        // PDFieldFactory can reconstruct the typed PDCheckBox from it.
         var widgetDict = widget.getCOSObject();
-
-        // Check for non-merged case: explicit Parent key present
         var parentBase = widgetDict.getDictionaryObject(COSName.PARENT);
         COSDictionary fieldDict = (parentBase instanceof COSDictionary pd) ? pd : widgetDict;
 
@@ -150,5 +179,68 @@ public class PdfLoader {
                 // isChecked() should not throw, but guard defensively
             }
         }
+    }
+
+    /**
+     * Attempts to extract the image bytes from the rubber stamp's normal appearance
+     * stream and populate the {@link ImageAnnotation} for in-app rendering.
+     * If extraction fails, the annotation is left as a placeholder (no image data).
+     */
+    private void restoreImageData(PDAnnotationRubberStamp stamp, ImageAnnotation ia) {
+        // Primary path: recover from the custom Base64 key written by PdfSaver.
+        // This is reliable regardless of the original image format (CMYK JPEG, GIF, etc.)
+        // and does not depend on PDFBox's image-decoding pipeline.
+        String b64 = stamp.getCOSObject().getString(COSName.getPDFName("PEScrotoImgData"));
+        if (b64 != null && !b64.isEmpty()) {
+            try {
+                byte[] bytes = Base64.getDecoder().decode(b64);
+                ia.setImageData(bytes);
+                try {
+                    ia.setFxImage(new javafx.scene.image.Image(new ByteArrayInputStream(bytes)));
+                } catch (Exception fxEx) {
+                    // Canvas will lazy-init on first draw
+                }
+                return; // successfully restored from custom key
+            } catch (Exception ex) {
+                LOG.warning("Could not decode custom image key; falling back to appearance stream: " + ex.getMessage());
+            }
+        }
+
+        // Fallback: recover from the appearance stream (for PDFs saved before the custom key was added).
+        try {
+            var appearance = stamp.getAppearance();
+            if (appearance == null) return;
+            var normalEntry = appearance.getNormalAppearance();
+            if (normalEntry == null) return;
+            var form = normalEntry.getAppearanceStream();
+            if (form == null || form.getResources() == null) return;
+
+            for (var name : form.getResources().getXObjectNames()) {
+                var xobj = form.getResources().getXObject(name);
+                if (xobj instanceof PDImageXObject pdImg) {
+                    var bos = new ByteArrayOutputStream();
+                    boolean written = ImageIO.write(pdImg.getImage(), "PNG", bos);
+                    if (!written) {
+                        LOG.warning("ImageIO could not write image from appearance stream.");
+                        break;
+                    }
+                    byte[] bytes = bos.toByteArray();
+                    if (bytes.length == 0) break;
+                    ia.setImageData(bytes);
+                    try {
+                        ia.setFxImage(new javafx.scene.image.Image(new ByteArrayInputStream(bytes)));
+                    } catch (Exception fxEx) {
+                        // Canvas will lazy-init on first draw
+                    }
+                    break;
+                }
+            }
+        } catch (Exception ex) {
+            LOG.warning("Could not restore image data from appearance stream: " + ex.getMessage());
+        }
+    }
+
+    private static String decodeLbl(String encoded) {
+        return encoded == null ? "" : encoded.replace("%3B", ";");
     }
 }

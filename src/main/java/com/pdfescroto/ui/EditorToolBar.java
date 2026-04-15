@@ -10,15 +10,12 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 
+import java.util.EnumMap;
+import java.util.Map;
+
 /**
  * Toolbar that provides tool-selection toggle buttons, page navigation controls,
- * and a Save button for the PDF editor.
- *
- * <p>Tool toggle buttons are grouped so that only one tool is active at a time;
- * {@link Tool#SELECT} is selected by default. Page navigation delegates to a
- * {@link PdfCanvas} bound via {@link #bindCanvas(PdfCanvas)}. The Save button
- * simulates a Ctrl+S key event on the scene, which {@code MainWindow}'s keyboard
- * shortcut handler intercepts to persist the document.</p>
+ * zoom controls, and a Save button for the PDF editor.
  */
 public class EditorToolBar {
 
@@ -27,44 +24,42 @@ public class EditorToolBar {
     private       PdfCanvas   canvas;
     private final Label       pageLabel   = new Label("Page — / —");
     private final Label       zoomLabel   = new Label("100%");
+    private final Button      zoomOutBtn  = new Button("−");
+    private final Button      zoomInBtn   = new Button("+");
     private int currentPage = 0;
 
-    /**
-     * Creates the toolbar for the given document and undo manager.
-     *
-     * @param doc the currently open PDF document
-     * @param um  the shared undo/redo manager
-     */
+    private final ToggleGroup            toggleGroup  = new ToggleGroup();
+    private final Map<Tool, ToggleButton> toolButtons  = new EnumMap<>(Tool.class);
+
     public EditorToolBar(PdfDocument doc, UndoManager um) {
         this.doc = doc;
         node.getStyleClass().add("tool-bar");
         node.setPadding(new Insets(4, 8, 4, 8));
         node.setSpacing(6);
 
-        // Tool toggle group
-        var tg        = new ToggleGroup();
-        var selectBtn = toolButton("↖ Select",   Tool.SELECT,   tg);
-        var textBtn   = toolButton("T Text",     Tool.TEXT,     tg);
-        var cbBtn     = toolButton("☑ Checkbox", Tool.CHECKBOX, tg);
-        var imgBtn    = toolButton("🖼 Image",    Tool.IMAGE,    tg);
+        var selectBtn = toolButton("↖ Select",   Tool.SELECT);
+        var textBtn   = toolButton("T Text",     Tool.TEXT);
+        var cbBtn     = toolButton("☑ Checkbox", Tool.CHECKBOX);
+        var imgBtn    = toolButton("🖼 Image",    Tool.IMAGE);
         selectBtn.setSelected(true);
 
-        // Vertical separator
         var sep = new Separator(Orientation.VERTICAL);
 
-        // Page navigation
         var prevBtn = new Button("◀");
         var nextBtn = new Button("▶");
         prevBtn.setOnAction(e -> navigatePage(-1));
         nextBtn.setOnAction(e -> navigatePage(+1));
         updatePageLabel();
 
-        // Flexible spacer
         var spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Save button — fires a simulated Ctrl+S key event on the scene so that
-        // MainWindow's keyboard shortcut handler can intercept it.
+        // Zoom buttons — disabled until a canvas is bound
+        zoomOutBtn.setDisable(true);
+        zoomInBtn.setDisable(true);
+        zoomOutBtn.setOnAction(e -> { if (canvas != null) canvas.zoomOut(); });
+        zoomInBtn.setOnAction(e  -> { if (canvas != null) canvas.zoomIn(); });
+
         var saveBtn = new Button("💾 Save");
         saveBtn.setStyle("-fx-background-color: #2e7d32; -fx-text-fill: white;");
         saveBtn.setOnAction(e -> {
@@ -77,29 +72,17 @@ public class EditorToolBar {
         });
 
         node.getChildren().addAll(selectBtn, textBtn, cbBtn, imgBtn,
-                sep, prevBtn, pageLabel, nextBtn, spacer, zoomLabel, saveBtn);
+                sep, prevBtn, pageLabel, nextBtn, spacer, zoomOutBtn, zoomLabel, zoomInBtn, saveBtn);
     }
 
-    /**
-     * Creates a {@link ToggleButton} that activates the given tool on the bound canvas.
-     *
-     * @param label the button label
-     * @param tool  the tool to activate when the button is selected
-     * @param tg    the toggle group to add the button to
-     * @return the configured toggle button
-     */
-    private ToggleButton toolButton(String label, Tool tool, ToggleGroup tg) {
+    private ToggleButton toolButton(String label, Tool tool) {
         var btn = new ToggleButton(label);
-        btn.setToggleGroup(tg);
+        btn.setToggleGroup(toggleGroup);
         btn.setOnAction(e -> { if (canvas != null) canvas.setActiveTool(tool); });
+        toolButtons.put(tool, btn);
         return btn;
     }
 
-    /**
-     * Navigates the canvas by the given page delta, clamping to the valid page range.
-     *
-     * @param delta number of pages to move (negative for backward, positive for forward)
-     */
     private void navigatePage(int delta) {
         if (canvas == null || doc == null) return;
         int next = currentPage + delta;
@@ -109,31 +92,24 @@ public class EditorToolBar {
         updatePageLabel();
     }
 
-    /**
-     * Refreshes the page label to reflect the current page index and total page count.
-     */
     private void updatePageLabel() {
         int total = doc != null ? doc.getPages().size() : 0;
         pageLabel.setText("Page " + (currentPage + 1) + " / " + total);
     }
 
-    /**
-     * Binds this toolbar to the given canvas so that tool-selection and
-     * page-navigation buttons can delegate to it.
-     *
-     * @param canvas the canvas to bind
-     */
     public void bindCanvas(PdfCanvas canvas) {
         this.canvas = canvas;
         zoomLabel.setText(Math.round(canvas.getScale() * 100) + "%");
         canvas.scaleProperty().addListener((obs, oldVal, newVal) ->
                 zoomLabel.setText(Math.round(newVal.doubleValue() * 100) + "%"));
+        canvas.activeToolProperty().addListener((obs, oldTool, newTool) -> {
+            ToggleButton btn = toolButtons.get(newTool);
+            if (btn != null) btn.setSelected(true);
+        });
+        // Enable zoom buttons now that a canvas is available
+        zoomOutBtn.setDisable(false);
+        zoomInBtn.setDisable(false);
     }
 
-    /**
-     * Returns the JavaFX node that represents this toolbar in the scene graph.
-     *
-     * @return the toolbar node
-     */
     public Node getNode() { return node; }
 }

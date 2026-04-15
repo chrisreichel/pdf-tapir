@@ -5,9 +5,10 @@ package com.pdfescroto.model;
  * Supports configurable font size and color.
  */
 public class TextAnnotation extends Annotation {
-    private String text      = "";
-    private float  fontSize  = 12f;
-    private String fontColor = "#000000";
+    private String text       = "";
+    private float  fontSize   = 12f;
+    private String fontColor  = "#000000";
+    private String fontFamily = "System";
 
     /**
      * Creates a TextAnnotation with the given bounding rectangle.
@@ -38,4 +39,10 @@ public class TextAnnotation extends Annotation {
 
     /** Sets the font color as a CSS hex string (e.g. {@code "#000000"}). */
     public void   setFontColor(String c) { this.fontColor = c; }
+
+    /** Returns the font family name (e.g. {@code "Arial"}). */
+    public String getFontFamily()         { return fontFamily; }
+
+    /** Sets the font family name (e.g. {@code "Arial"}). */
+    public void   setFontFamily(String f) { this.fontFamily = f; }
 }

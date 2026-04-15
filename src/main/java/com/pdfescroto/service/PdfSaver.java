@@ -1,8 +1,12 @@
 package com.pdfescroto.service;
 
 import com.pdfescroto.model.*;
+import org.apache.pdfbox.cos.COSDictionary;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.color.PDColor;
+import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceRGB;
 import org.apache.pdfbox.pdmodel.interactive.annotation.*;
 import org.apache.pdfbox.pdmodel.interactive.form.*;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
@@ -12,6 +16,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 
 /**
@@ -81,7 +86,7 @@ public class PdfSaver {
                 } else if (annotation instanceof CheckboxAnnotation ca) {
                     writeCheckbox(pdDoc, pdPage, workingList, ca);
                 } else if (annotation instanceof ImageAnnotation ia) {
-                    writeImage(pdDoc, workingList, ia);
+                    writeImage(pdDoc, pdPage, workingList, ia);
                 }
             }
             pdPage.setAnnotations(workingList);
@@ -113,8 +118,10 @@ public class PdfSaver {
         annot.setSubject(TAG_TEXT);
         annot.setContents(ta.getText());
         annot.setRectangle(rect);
-        // Store font size in the title popup field (/T) so it can be recovered by PdfLoader
-        annot.setTitlePopup("fs=" + ta.getFontSize()); // store as float string, e.g. "fs=11.5"
+        // Store font metadata in /T as semicolon-separated key=value pairs so PdfLoader can recover them
+        annot.setTitlePopup("fs=" + ta.getFontSize()
+                + ";fc=" + ta.getFontColor()
+                + ";ff=" + ta.getFontFamily());
         annot.setDefaultAppearance("/Helvetica " + ta.getFontSize() + " Tf 0 0 0 rg");
         annotations.add(annot);
     }
@@ -140,18 +147,28 @@ public class PdfSaver {
         var widget = checkbox.getWidgets().get(0);
         // PDAnnotationWidget does not extend PDAnnotationMarkup, so use annotationName as tag
         widget.setAnnotationName(TAG_CHECKBOX);
+        // Store all checkbox metadata in widget /Contents for reliable recovery by PdfLoader.
+        // Format: "cc=<color>;chk=<true|false>;lbl=<label>" (label is semicolon-escaped).
+        widget.setContents("cc=" + ca.getCheckmarkColor()
+                + ";chk=" + ca.isChecked()
+                + ";lbl=" + encodeLbl(ca.getLabel()));
         widget.setPage(pdPage);
         widget.setRectangle(new PDRectangle(
                 (float) ca.getX(), (float) ca.getY(),
                 (float) ca.getWidth(), (float) ca.getHeight()));
+        widget.setPrinted(true);
+        widget.setAppearance(buildCheckboxAppearance(pdDoc, ca));
 
         acroForm.getFields().add(checkbox);
         annotations.add(widget);
 
+        String onValue = checkbox.getOnValue();
         if (ca.isChecked()) {
             checkbox.check();
+            widget.setAppearanceState(onValue);
         } else {
             checkbox.unCheck();
+            widget.setAppearanceState(COSName.Off.getName());
         }
     }
 
@@ -165,24 +182,33 @@ public class PdfSaver {
      * @throws IOException if the image cannot be embedded
      */
     private void writeImage(PDDocument pdDoc,
+                             PDPage pdPage,
                              List<PDAnnotation> annotations,
                              ImageAnnotation ia) throws IOException {
-        if (ia.getImageData() == null) return;
+        if (ia.getImageData() == null || ia.getImageData().length == 0) return;
         var rect  = toPdRect(ia);
         var stamp = new PDAnnotationRubberStamp();
         stamp.setSubject(TAG_IMAGE);
         stamp.setRectangle(rect);
+        stamp.setPage(pdPage);
+        stamp.setPrinted(true);
 
         var pdImage      = PDImageXObject.createFromByteArray(pdDoc, ia.getImageData(), "img");
         var appearStream = new PDAppearanceStream(pdDoc);
         appearStream.setResources(new PDResources());
-        appearStream.setBBox(rect);
+        appearStream.setBBox(new PDRectangle(rect.getWidth(), rect.getHeight()));
         try (var cs = new PDPageContentStream(pdDoc, appearStream)) {
             cs.drawImage(pdImage, 0, 0, rect.getWidth(), rect.getHeight());
         }
         var appearDict = new PDAppearanceDictionary();
         appearDict.setNormalAppearance(appearStream);
         stamp.setAppearance(appearDict);
+
+        // Store original image bytes as Base64 in a custom key so that reload does not
+        // depend on PDFBox's image-decoding pipeline (which can fail for CMYK JPEG, GIF, etc.).
+        stamp.getCOSObject().setString(
+                COSName.getPDFName("PEScrotoImgData"),
+                Base64.getEncoder().encodeToString(ia.getImageData()));
 
         annotations.add(stamp);
     }
@@ -208,5 +234,62 @@ public class PdfSaver {
         if (acroForm == null) return;
         acroForm.getFields().removeIf(f ->
                 f.getPartialName() != null && f.getPartialName().startsWith(CB_PREFIX));
+    }
+
+    private PDAppearanceDictionary buildCheckboxAppearance(PDDocument pdDoc,
+                                                           CheckboxAnnotation ca) throws IOException {
+        var width = (float) ca.getWidth();
+        var height = (float) ca.getHeight();
+        var bbox = new PDRectangle(width, height);
+
+        var offStream = new PDAppearanceStream(pdDoc);
+        offStream.setResources(new PDResources());
+        offStream.setBBox(bbox);
+        try (var cs = new PDPageContentStream(pdDoc, offStream)) {
+            cs.setLineWidth(1f);
+            cs.addRect(0.5f, 0.5f, Math.max(0, width - 1f), Math.max(0, height - 1f));
+            cs.stroke();
+        }
+
+        var onStream = new PDAppearanceStream(pdDoc);
+        onStream.setResources(new PDResources());
+        onStream.setBBox(bbox);
+        try (var cs = new PDPageContentStream(pdDoc, onStream)) {
+            cs.setLineWidth(1f);
+            cs.addRect(0.5f, 0.5f, Math.max(0, width - 1f), Math.max(0, height - 1f));
+            cs.stroke();
+
+            var color = parseRgbColor(ca.getCheckmarkColor());
+            cs.setStrokingColor(color.getComponents()[0], color.getComponents()[1], color.getComponents()[2]);
+            cs.setLineWidth(Math.max(1.5f, Math.min(width, height) * 0.12f));
+            cs.moveTo(width * 0.18f, height * 0.5f);
+            cs.lineTo(width * 0.42f, height * 0.22f);
+            cs.lineTo(width * 0.82f, height * 0.78f);
+            cs.stroke();
+        }
+
+        var normalAppearances = new COSDictionary();
+        normalAppearances.setItem(COSName.Off, offStream);
+        normalAppearances.setItem(COSName.YES, onStream);
+
+        var appearance = new PDAppearanceDictionary();
+        appearance.setNormalAppearance(new PDAppearanceEntry(normalAppearances));
+        return appearance;
+    }
+
+    private PDColor parseRgbColor(String hex) {
+        if (hex == null || !hex.matches("^#?[0-9a-fA-F]{6}$")) {
+            return new PDColor(new float[]{0f, 0f, 0f}, PDDeviceRGB.INSTANCE);
+        }
+        String normalized = hex.startsWith("#") ? hex.substring(1) : hex;
+        float red = Integer.parseInt(normalized.substring(0, 2), 16) / 255f;
+        float green = Integer.parseInt(normalized.substring(2, 4), 16) / 255f;
+        float blue = Integer.parseInt(normalized.substring(4, 6), 16) / 255f;
+        return new PDColor(new float[]{red, green, blue}, PDDeviceRGB.INSTANCE);
+    }
+
+    /** Percent-encodes the semicolon character so it can safely appear inside the /Contents string. */
+    private static String encodeLbl(String label) {
+        return label == null ? "" : label.replace(";", "%3B");
     }
 }

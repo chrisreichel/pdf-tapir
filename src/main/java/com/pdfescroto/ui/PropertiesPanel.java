@@ -7,6 +7,9 @@ import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+
+import java.util.List;
 
 public class PropertiesPanel {
 
@@ -22,28 +25,40 @@ public class PropertiesPanel {
     private final TextField hField = new TextField();
 
     // Text-only section
-    private final TextField textField   = new TextField();
-    private final TextField fontField   = new TextField();
-    private final VBox      textSection = new VBox(4);
+    private final TextField    textField      = new TextField();
+    private final TextField    fontField      = new TextField();
+    private final ColorPicker  textColorPicker = new ColorPicker(Color.BLACK);
+    private final ComboBox<String> fontFamilyBox  = new ComboBox<>();
+    private final VBox         textSection    = new VBox(4);
 
     // Checkbox-only section
-    private final TextField labelField = new TextField();
-    private final CheckBox  checkedBox = new CheckBox("Checked");
-    private final VBox      cbSection  = new VBox(4);
+    private final TextField   labelField    = new TextField();
+    private final CheckBox    checkedBox    = new CheckBox("Checked");
+    private final ColorPicker cbColorPicker = new ColorPicker(Color.BLACK);
+    private final VBox        cbSection     = new VBox(4);
 
     public PropertiesPanel(UndoManager undoManager, Runnable onRedraw) {
         this.undoManager = undoManager;
         this.onRedraw    = onRedraw;
         node.getStyleClass().add("properties-panel");
-        node.setPrefWidth(170);
+        node.setPrefWidth(200);
         node.setPadding(new Insets(10));
+        fontFamilyBox.getItems().addAll(
+                "System", "Arial", "Times New Roman", "Courier New", "Georgia", "Verdana");
         buildLayout();
         showAnnotation(null);
     }
 
     private void buildLayout() {
-        textSection.getChildren().addAll(label("Text"), textField, label("Font size"), fontField);
-        cbSection.getChildren().addAll(label("Label"), labelField, checkedBox);
+        textSection.getChildren().addAll(
+                label("Text"), textField,
+                label("Font size"), fontField,
+                label("Font color"), textColorPicker,
+                label("Font family"), fontFamilyBox);
+        cbSection.getChildren().addAll(
+                label("Label"), labelField,
+                checkedBox,
+                label("Checkmark color"), cbColorPicker);
 
         node.getChildren().addAll(
                 bold("Properties"),
@@ -61,13 +76,12 @@ public class PropertiesPanel {
         // Text content
         commitOnChange(textField, () -> {
             if (!(current instanceof TextAnnotation ta)) return;
-            var ann = ta; // ta is already a captured local from the pattern binding
-            String old = ann.getText();
+            String old = ta.getText();
             String nw  = textField.getText();
             if (old.equals(nw)) return;
             undoManager.execute(new EditAnnotationCommand(
-                    () -> { ann.setText(nw);  onRedraw.run(); },
-                    () -> { ann.setText(old); onRedraw.run(); }));
+                    () -> { ta.setText(nw);  onRedraw.run(); },
+                    () -> { ta.setText(old); onRedraw.run(); }));
         });
 
         // Font size
@@ -81,6 +95,28 @@ public class PropertiesPanel {
                         () -> { ta.setFontSize(nw);  onRedraw.run(); },
                         () -> { ta.setFontSize(old); onRedraw.run(); }));
             } catch (NumberFormatException ignored) {}
+        });
+
+        // Text font color
+        textColorPicker.setOnAction(e -> {
+            if (!(current instanceof TextAnnotation ta)) return;
+            String old = ta.getFontColor();
+            String nw  = toHex(textColorPicker.getValue());
+            if (old.equalsIgnoreCase(nw)) return;
+            undoManager.execute(new EditAnnotationCommand(
+                    () -> { ta.setFontColor(nw);  onRedraw.run(); },
+                    () -> { ta.setFontColor(old); onRedraw.run(); }));
+        });
+
+        // Font family
+        fontFamilyBox.setOnAction(e -> {
+            if (!(current instanceof TextAnnotation ta)) return;
+            String old = ta.getFontFamily();
+            String nw  = fontFamilyBox.getValue();
+            if (nw == null || nw.equals(old)) return;
+            undoManager.execute(new EditAnnotationCommand(
+                    () -> { ta.setFontFamily(nw);  onRedraw.run(); },
+                    () -> { ta.setFontFamily(old); onRedraw.run(); }));
         });
 
         // Checkbox label
@@ -102,6 +138,17 @@ public class PropertiesPanel {
             undoManager.execute(new EditAnnotationCommand(
                     () -> { ca.setChecked(nw);  onRedraw.run(); },
                     () -> { ca.setChecked(old); onRedraw.run(); }));
+        });
+
+        // Checkmark color
+        cbColorPicker.setOnAction(e -> {
+            if (!(current instanceof CheckboxAnnotation ca)) return;
+            String old = ca.getCheckmarkColor();
+            String nw  = toHex(cbColorPicker.getValue());
+            if (old.equalsIgnoreCase(nw)) return;
+            undoManager.execute(new EditAnnotationCommand(
+                    () -> { ca.setCheckmarkColor(nw);  onRedraw.run(); },
+                    () -> { ca.setCheckmarkColor(old); onRedraw.run(); }));
         });
     }
 
@@ -130,15 +177,23 @@ public class PropertiesPanel {
         if (a instanceof TextAnnotation ta) {
             textField.setText(ta.getText());
             fontField.setText(String.valueOf((int) ta.getFontSize()));
+            textColorPicker.setValue(parseColor(ta.getFontColor()));
+            String family = ta.getFontFamily();
+            if (fontFamilyBox.getItems().contains(family)) {
+                fontFamilyBox.setValue(family);
+            } else {
+                fontFamilyBox.setValue("System");
+            }
         } else if (a instanceof CheckboxAnnotation ca) {
             labelField.setText(ca.getLabel());
             checkedBox.setSelected(ca.isChecked());
+            cbColorPicker.setValue(parseColor(ca.getCheckmarkColor()));
         }
     }
 
     private void commitMove() {
         if (current == null) return;
-        var ann = current; // capture before any async operation
+        var ann = current;
         try {
             double oldX = ann.getX(), oldY = ann.getY();
             double newX = Double.parseDouble(xField.getText());
@@ -152,7 +207,7 @@ public class PropertiesPanel {
 
     private void commitResize() {
         if (current == null) return;
-        var ann = current; // capture before any async operation
+        var ann = current;
         try {
             double oldW = ann.getWidth(), oldH = ann.getHeight();
             double newW = Double.parseDouble(wField.getText());
@@ -167,6 +222,17 @@ public class PropertiesPanel {
     private void commitOnChange(TextField tf, Runnable action) {
         tf.setOnAction(e -> action.run());
         tf.focusedProperty().addListener((obs, was, focused) -> { if (!focused) action.run(); });
+    }
+
+    private String toHex(Color c) {
+        return String.format("#%02x%02x%02x",
+                (int) Math.round(c.getRed()   * 255),
+                (int) Math.round(c.getGreen() * 255),
+                (int) Math.round(c.getBlue()  * 255));
+    }
+
+    private Color parseColor(String hex) {
+        try { return Color.web(hex); } catch (Exception e) { return Color.BLACK; }
     }
 
     private Label label(String text) {
