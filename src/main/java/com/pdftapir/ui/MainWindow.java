@@ -19,6 +19,9 @@ import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import javax.swing.SwingUtilities;
+import java.awt.print.PrinterException;
+import java.awt.print.PrinterJob;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -26,6 +29,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.pdfbox.printing.PDFPageable;
 
 /**
  * Root UI controller that owns the primary {@link Stage} and assembles the
@@ -74,20 +78,34 @@ public class MainWindow {
 
     private MenuBar buildMenuBar() {
         var openItem          = new MenuItem("Open\u2026");
+        var closeItem         = new MenuItem("Close");
         var saveItem          = new MenuItem("Save");
         var saveAsItem        = new MenuItem("Save As\u2026");
         var exportFlatItem    = new MenuItem("Export Flattened PDF\u2026");
+        var printItem         = new MenuItem("Print\u2026");
         var exitItem          = new MenuItem("Exit");
 
         openItem.setOnAction(e -> openFile());
+        closeItem.setOnAction(e -> closeFile());
         saveItem.setOnAction(e -> saveFile(false));
         saveAsItem.setOnAction(e -> saveFile(true));
         exportFlatItem.setOnAction(e -> exportFlattenedPdf());
+        printItem.setOnAction(e -> printDocument());
         exitItem.setOnAction(e -> Platform.exit());
 
-        var fileMenu = new Menu("File", null, openItem, saveItem, saveAsItem, exportFlatItem,
+        var fileMenu = new Menu("File", null,
+                openItem, closeItem,
+                new SeparatorMenuItem(),
+                saveItem, saveAsItem, exportFlatItem, printItem,
                 new SeparatorMenuItem(), exitItem);
-        fileMenu.setOnShowing(e -> exportFlatItem.setDisable(openDocument == null));
+        fileMenu.setOnShowing(e -> {
+            boolean hasDoc = openDocument != null;
+            closeItem.setDisable(!hasDoc);
+            saveItem.setDisable(!hasDoc);
+            saveAsItem.setDisable(!hasDoc);
+            exportFlatItem.setDisable(!hasDoc);
+            printItem.setDisable(!hasDoc);
+        });
 
         var undoItem = new MenuItem("Undo");
         var redoItem = new MenuItem("Redo");
@@ -156,6 +174,18 @@ public class MainWindow {
                 }
             });
         });
+    }
+
+    private void closeFile() {
+        if (openDocument == null) return;
+        try { openDocument.getPdDocument().close(); } catch (Exception ignored) {}
+        openDocument = null;
+        canvas = null;
+        scrollPane = null;
+        undoManager.clear();
+        saveIntentDecided.clear();
+        root.setCenter(null);
+        root.setTop(buildMenuBar());
     }
 
     private void openFile() {
@@ -274,6 +304,26 @@ public class MainWindow {
         };
         task.setOnFailed(e -> showError("Save failed", task.getException()));
         new Thread(task, "pdf-saver").start();
+    }
+
+    private void printDocument() {
+        if (openDocument == null) return;
+        var pdDoc = openDocument.getPdDocument();
+        SwingUtilities.invokeLater(() -> {
+            try {
+                var printerJob = PrinterJob.getPrinterJob();
+                printerJob.setPageable(new PDFPageable(pdDoc));
+                if (printerJob.printDialog()) {
+                    try {
+                        printerJob.print();
+                    } catch (PrinterException ex) {
+                        Platform.runLater(() -> showError("Print failed", ex));
+                    }
+                }
+            } catch (Exception ex) {
+                Platform.runLater(() -> showError("Print failed", ex));
+            }
+        });
     }
 
     private void exportFlattenedPdf() {
