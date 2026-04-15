@@ -1,4 +1,4 @@
-# PDF Escroto — Visual PDF Editor Implementation Plan
+# PDF Tapir — Visual PDF Editor Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -15,7 +15,7 @@
 | File | Responsibility |
 |---|---|
 | `pom.xml` | Maven build, dependencies, javafx-maven-plugin |
-| `PdfEscrotoApp.java` | JavaFX Application entry point |
+| `PdfTapirApp.java` | JavaFX Application entry point |
 | `model/Annotation.java` | Abstract base: id, x, y, width, height (PDF points) |
 | `model/TextAnnotation.java` | text, fontSize, fontColor |
 | `model/CheckboxAnnotation.java` | label, checked |
@@ -49,7 +49,7 @@
 
 **Files:**
 - Create: `pom.xml`
-- Create: `src/main/java/com/pdfescroto/.gitkeep`
+- Create: `src/main/java/com/pdftapir/.gitkeep`
 
 - [ ] **Step 1: Create `pom.xml`**
 
@@ -60,8 +60,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.pdfescroto</groupId>
-    <artifactId>pdf-escroto</artifactId>
+    <groupId>com.pdftapir</groupId>
+    <artifactId>pdf-tapir</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
@@ -104,7 +104,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>com.pdfescroto.PdfEscrotoApp</mainClass>
+                    <mainClass>com.pdftapir.PdfTapirApp</mainClass>
                 </configuration>
             </plugin>
             <plugin>
@@ -120,8 +120,8 @@
 - [ ] **Step 2: Create the package directory tree**
 
 ```bash
-mkdir -p src/main/java/com/pdfescroto/{model,service,command,ui}
-mkdir -p src/test/java/com/pdfescroto/{service,command}
+mkdir -p src/main/java/com/pdftapir/{model,service,command,ui}
+mkdir -p src/test/java/com/pdftapir/{service,command}
 ```
 
 - [ ] **Step 3: Verify Maven downloads dependencies**
@@ -145,19 +145,19 @@ git commit -m "chore: initial Maven scaffold with JavaFX 21 and PDFBox 3"
 ## Task 2: Model Layer
 
 **Files:**
-- Create: `src/main/java/com/pdfescroto/model/Annotation.java`
-- Create: `src/main/java/com/pdfescroto/model/TextAnnotation.java`
-- Create: `src/main/java/com/pdfescroto/model/CheckboxAnnotation.java`
-- Create: `src/main/java/com/pdfescroto/model/ImageAnnotation.java`
-- Create: `src/main/java/com/pdfescroto/model/PdfPage.java`
-- Create: `src/main/java/com/pdfescroto/model/PdfDocument.java`
+- Create: `src/main/java/com/pdftapir/model/Annotation.java`
+- Create: `src/main/java/com/pdftapir/model/TextAnnotation.java`
+- Create: `src/main/java/com/pdftapir/model/CheckboxAnnotation.java`
+- Create: `src/main/java/com/pdftapir/model/ImageAnnotation.java`
+- Create: `src/main/java/com/pdftapir/model/PdfPage.java`
+- Create: `src/main/java/com/pdftapir/model/PdfDocument.java`
 
 - [ ] **Step 1: Create `Annotation.java`**
 
 Coordinates are in PDF points, bottom-left origin.
 
 ```java
-package com.pdfescroto.model;
+package com.pdftapir.model;
 
 import java.util.UUID;
 
@@ -187,7 +187,7 @@ public abstract class Annotation {
 - [ ] **Step 2: Create `TextAnnotation.java`**
 
 ```java
-package com.pdfescroto.model;
+package com.pdftapir.model;
 
 public class TextAnnotation extends Annotation {
     private String text      = "";
@@ -210,7 +210,7 @@ public class TextAnnotation extends Annotation {
 - [ ] **Step 3: Create `CheckboxAnnotation.java`**
 
 ```java
-package com.pdfescroto.model;
+package com.pdftapir.model;
 
 public class CheckboxAnnotation extends Annotation {
     private String  label   = "";
@@ -230,7 +230,7 @@ public class CheckboxAnnotation extends Annotation {
 - [ ] **Step 4: Create `ImageAnnotation.java`**
 
 ```java
-package com.pdfescroto.model;
+package com.pdftapir.model;
 
 import javafx.scene.image.Image;
 
@@ -252,7 +252,7 @@ public class ImageAnnotation extends Annotation {
 - [ ] **Step 5: Create `PdfPage.java`**
 
 ```java
-package com.pdfescroto.model;
+package com.pdftapir.model;
 
 import javafx.scene.image.WritableImage;
 import java.util.ArrayList;
@@ -288,7 +288,7 @@ public class PdfPage {
 - [ ] **Step 6: Create `PdfDocument.java`**
 
 ```java
-package com.pdfescroto.model;
+package com.pdftapir.model;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import java.io.File;
@@ -327,7 +327,7 @@ Expected: `BUILD SUCCESS`
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/main/java/com/pdfescroto/model/
+git add src/main/java/com/pdftapir/model/
 git commit -m "feat: add model layer (Annotation hierarchy, PdfPage, PdfDocument)"
 ```
 
@@ -336,13 +336,13 @@ git commit -m "feat: add model layer (Annotation hierarchy, PdfPage, PdfDocument
 ## Task 3: CoordinateMapper (TDD)
 
 **Files:**
-- Create: `src/main/java/com/pdfescroto/service/CoordinateMapper.java`
-- Create: `src/test/java/com/pdfescroto/service/CoordinateMapperTest.java`
+- Create: `src/main/java/com/pdftapir/service/CoordinateMapper.java`
+- Create: `src/test/java/com/pdftapir/service/CoordinateMapperTest.java`
 
 - [ ] **Step 1: Write the failing tests**
 
 ```java
-package com.pdfescroto.service;
+package com.pdftapir.service;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -411,7 +411,7 @@ Expected: compilation error (class doesn't exist yet)
 - [ ] **Step 3: Implement `CoordinateMapper.java`**
 
 ```java
-package com.pdfescroto.service;
+package com.pdftapir.service;
 
 public class CoordinateMapper {
     private final float  pageHeightPt;
@@ -475,12 +475,12 @@ git commit -m "feat: add CoordinateMapper with full test coverage"
 ## Task 4: PdfRenderer
 
 **Files:**
-- Create: `src/main/java/com/pdfescroto/service/PdfRenderer.java`
+- Create: `src/main/java/com/pdftapir/service/PdfRenderer.java`
 
 - [ ] **Step 1: Create `PdfRenderer.java`**
 
 ```java
-package com.pdfescroto.service;
+package com.pdftapir.service;
 
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.image.WritableImage;
@@ -515,7 +515,7 @@ Expected: `BUILD SUCCESS`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/com/pdfescroto/service/PdfRenderer.java
+git add src/main/java/com/pdftapir/service/PdfRenderer.java
 git commit -m "feat: add PdfRenderer wrapping PDFBox PDFRenderer"
 ```
 
@@ -524,18 +524,18 @@ git commit -m "feat: add PdfRenderer wrapping PDFBox PDFRenderer"
 ## Task 5: PdfSaver + PdfLoader (TDD Round-Trip)
 
 **Files:**
-- Create: `src/main/java/com/pdfescroto/service/PdfLoader.java`
-- Create: `src/main/java/com/pdfescroto/service/PdfSaver.java`
-- Create: `src/test/java/com/pdfescroto/service/PdfRoundTripTest.java`
+- Create: `src/main/java/com/pdftapir/service/PdfLoader.java`
+- Create: `src/main/java/com/pdftapir/service/PdfSaver.java`
+- Create: `src/test/java/com/pdftapir/service/PdfRoundTripTest.java`
 
-Annotations written by this tool are tagged with `Subject = "pdf-escroto-<type>"` so the loader can identify them on re-open. For checkboxes, field names are prefixed `pescroto_<id>`.
+Annotations written by this tool are tagged with `Subject = "pdf-tapir-<type>"` so the loader can identify them on re-open. For checkboxes, field names are prefixed `ptapir_<id>`.
 
 - [ ] **Step 1: Write round-trip integration test**
 
 ```java
-package com.pdfescroto.service;
+package com.pdftapir.service;
 
-import com.pdfescroto.model.*;
+import com.pdftapir.model.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
@@ -551,7 +551,7 @@ class PdfRoundTripTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        tempFile = File.createTempFile("pescroto-test-", ".pdf");
+        tempFile = File.createTempFile("ptapir-test-", ".pdf");
         tempFile.deleteOnExit();
         // Create a minimal 1-page PDF
         try (var doc = new PDDocument()) {
@@ -622,9 +622,9 @@ Expected: compilation error
 - [ ] **Step 3: Create `PdfSaver.java`**
 
 ```java
-package com.pdfescroto.service;
+package com.pdftapir.service;
 
-import com.pdfescroto.model.*;
+import com.pdftapir.model.*;
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.interactive.annotation.*;
@@ -637,10 +637,10 @@ import java.util.List;
 
 public class PdfSaver {
 
-    private static final String TAG_TEXT     = "pdf-escroto-text";
-    private static final String TAG_CHECKBOX = "pdf-escroto-checkbox";
-    private static final String TAG_IMAGE    = "pdf-escroto-image";
-    private static final String CB_PREFIX    = "pescroto_";
+    private static final String TAG_TEXT     = "pdf-tapir-text";
+    private static final String TAG_CHECKBOX = "pdf-tapir-checkbox";
+    private static final String TAG_IMAGE    = "pdf-tapir-image";
+    private static final String CB_PREFIX    = "ptapir_";
 
     public void save(PdfDocument document, File target) throws IOException {
         var pdDoc = document.getPdDocument();
@@ -648,7 +648,7 @@ public class PdfSaver {
         for (var page : document.getPages()) {
             var pdPage = pdDoc.getPage(page.getPageIndex());
 
-            // Remove previously written pdf-escroto annotations
+            // Remove previously written pdf-tapir annotations
             var existing = pdPage.getAnnotations();
             existing.removeIf(a -> TAG_TEXT.equals(a.getSubject())
                                 || TAG_IMAGE.equals(a.getSubject()));
@@ -670,7 +670,7 @@ public class PdfSaver {
         }
 
         // Write to temp file then rename
-        var tmp = File.createTempFile("pescroto-", ".pdf", target.getParentFile());
+        var tmp = File.createTempFile("ptapir-", ".pdf", target.getParentFile());
         try {
             pdDoc.save(tmp);
             Files.move(tmp.toPath(), target.toPath(),
@@ -768,9 +768,9 @@ public class PdfSaver {
 - [ ] **Step 4: Create `PdfLoader.java`**
 
 ```java
-package com.pdfescroto.service;
+package com.pdftapir.service;
 
-import com.pdfescroto.model.*;
+import com.pdftapir.model.*;
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.interactive.annotation.*;
 import org.apache.pdfbox.pdmodel.interactive.form.*;
@@ -782,9 +782,9 @@ import java.util.Optional;
 
 public class PdfLoader {
 
-    private static final String TAG_TEXT     = "pdf-escroto-text";
-    private static final String TAG_CHECKBOX = "pdf-escroto-checkbox";
-    private static final String TAG_IMAGE    = "pdf-escroto-image";
+    private static final String TAG_TEXT     = "pdf-tapir-text";
+    private static final String TAG_CHECKBOX = "pdf-tapir-checkbox";
+    private static final String TAG_IMAGE    = "pdf-tapir-image";
 
     private final PdfRenderer renderer = new PdfRenderer();
 
@@ -865,14 +865,14 @@ git commit -m "feat: add PdfLoader and PdfSaver with round-trip annotation persi
 ## Task 6: UndoManager + Command Interface (TDD)
 
 **Files:**
-- Create: `src/main/java/com/pdfescroto/command/Command.java`
-- Create: `src/main/java/com/pdfescroto/command/UndoManager.java`
-- Create: `src/test/java/com/pdfescroto/command/UndoManagerTest.java`
+- Create: `src/main/java/com/pdftapir/command/Command.java`
+- Create: `src/main/java/com/pdftapir/command/UndoManager.java`
+- Create: `src/test/java/com/pdftapir/command/UndoManagerTest.java`
 
 - [ ] **Step 1: Write failing tests**
 
 ```java
-package com.pdfescroto.command;
+package com.pdftapir.command;
 
 import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
@@ -964,7 +964,7 @@ mvn test -Dtest=UndoManagerTest 2>&1 | tail -4
 - [ ] **Step 3: Create `Command.java`**
 
 ```java
-package com.pdfescroto.command;
+package com.pdftapir.command;
 
 public interface Command {
     void execute();
@@ -975,7 +975,7 @@ public interface Command {
 - [ ] **Step 4: Create `UndoManager.java`**
 
 ```java
-package com.pdfescroto.command;
+package com.pdftapir.command;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -1033,19 +1033,19 @@ git commit -m "feat: add Command interface and UndoManager with full test covera
 ## Task 7: Annotation Commands
 
 **Files:**
-- Create: `src/main/java/com/pdfescroto/command/AddAnnotationCommand.java`
-- Create: `src/main/java/com/pdfescroto/command/DeleteAnnotationCommand.java`
-- Create: `src/main/java/com/pdfescroto/command/MoveAnnotationCommand.java`
-- Create: `src/main/java/com/pdfescroto/command/ResizeAnnotationCommand.java`
-- Create: `src/main/java/com/pdfescroto/command/EditAnnotationCommand.java`
+- Create: `src/main/java/com/pdftapir/command/AddAnnotationCommand.java`
+- Create: `src/main/java/com/pdftapir/command/DeleteAnnotationCommand.java`
+- Create: `src/main/java/com/pdftapir/command/MoveAnnotationCommand.java`
+- Create: `src/main/java/com/pdftapir/command/ResizeAnnotationCommand.java`
+- Create: `src/main/java/com/pdftapir/command/EditAnnotationCommand.java`
 
 - [ ] **Step 1: Create `AddAnnotationCommand.java`**
 
 ```java
-package com.pdfescroto.command;
+package com.pdftapir.command;
 
-import com.pdfescroto.model.Annotation;
-import com.pdfescroto.model.PdfPage;
+import com.pdftapir.model.Annotation;
+import com.pdftapir.model.PdfPage;
 
 public class AddAnnotationCommand implements Command {
     private final PdfPage  page;
@@ -1063,10 +1063,10 @@ public class AddAnnotationCommand implements Command {
 - [ ] **Step 2: Create `DeleteAnnotationCommand.java`**
 
 ```java
-package com.pdfescroto.command;
+package com.pdftapir.command;
 
-import com.pdfescroto.model.Annotation;
-import com.pdfescroto.model.PdfPage;
+import com.pdftapir.model.Annotation;
+import com.pdftapir.model.PdfPage;
 
 public class DeleteAnnotationCommand implements Command {
     private final PdfPage  page;
@@ -1084,9 +1084,9 @@ public class DeleteAnnotationCommand implements Command {
 - [ ] **Step 3: Create `MoveAnnotationCommand.java`**
 
 ```java
-package com.pdfescroto.command;
+package com.pdftapir.command;
 
-import com.pdfescroto.model.Annotation;
+import com.pdftapir.model.Annotation;
 
 public class MoveAnnotationCommand implements Command {
     private final Annotation annotation;
@@ -1108,9 +1108,9 @@ public class MoveAnnotationCommand implements Command {
 - [ ] **Step 4: Create `ResizeAnnotationCommand.java`**
 
 ```java
-package com.pdfescroto.command;
+package com.pdftapir.command;
 
-import com.pdfescroto.model.Annotation;
+import com.pdftapir.model.Annotation;
 
 public class ResizeAnnotationCommand implements Command {
     private final Annotation annotation;
@@ -1144,7 +1144,7 @@ public class ResizeAnnotationCommand implements Command {
 Generic property edit: captures old/new values via `Runnable` setters.
 
 ```java
-package com.pdfescroto.command;
+package com.pdftapir.command;
 
 public class EditAnnotationCommand implements Command {
     private final Runnable applyNew;
@@ -1175,7 +1175,7 @@ Expected: `BUILD SUCCESS`
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/main/java/com/pdfescroto/command/
+git add src/main/java/com/pdftapir/command/
 git commit -m "feat: add annotation commands (add, delete, move, resize, edit)"
 ```
 
@@ -1184,20 +1184,20 @@ git commit -m "feat: add annotation commands (add, delete, move, resize, edit)"
 ## Task 8: MainWindow Skeleton
 
 **Files:**
-- Create: `src/main/java/com/pdfescroto/PdfEscrotoApp.java`
-- Create: `src/main/java/com/pdfescroto/ui/MainWindow.java`
+- Create: `src/main/java/com/pdftapir/PdfTapirApp.java`
+- Create: `src/main/java/com/pdftapir/ui/MainWindow.java`
 
-- [ ] **Step 1: Create `PdfEscrotoApp.java`**
+- [ ] **Step 1: Create `PdfTapirApp.java`**
 
 ```java
-package com.pdfescroto;
+package com.pdftapir;
 
-import com.pdfescroto.ui.MainWindow;
+import com.pdftapir.ui.MainWindow;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
-public class PdfEscrotoApp extends Application {
+public class PdfTapirApp extends Application {
 
     public static void main(String[] args) {
         launch(args);
@@ -1208,15 +1208,15 @@ public class PdfEscrotoApp extends Application {
         var window = new MainWindow(primaryStage);
         var scene  = new Scene(window.getRoot(), 1100, 750);
         scene.getStylesheets().add(
-                getClass().getResource("/com/pdfescroto/style.css").toExternalForm());
-        primaryStage.setTitle("PDF Escroto");
+                getClass().getResource("/com/pdftapir/style.css").toExternalForm());
+        primaryStage.setTitle("PDF Tapir");
         primaryStage.setScene(scene);
         primaryStage.show();
     }
 }
 ```
 
-- [ ] **Step 2: Create `src/main/resources/com/pdfescroto/style.css`**
+- [ ] **Step 2: Create `src/main/resources/com/pdftapir/style.css`**
 
 ```css
 .root {
@@ -1238,12 +1238,12 @@ public class PdfEscrotoApp extends Application {
 - [ ] **Step 3: Create `MainWindow.java`** (skeleton — wired up fully in Task 14)
 
 ```java
-package com.pdfescroto.ui;
+package com.pdftapir.ui;
 
-import com.pdfescroto.command.UndoManager;
-import com.pdfescroto.model.PdfDocument;
-import com.pdfescroto.service.PdfLoader;
-import com.pdfescroto.service.PdfSaver;
+import com.pdftapir.command.UndoManager;
+import com.pdftapir.model.PdfDocument;
+import com.pdftapir.service.PdfLoader;
+import com.pdftapir.service.PdfSaver;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.scene.control.*;
@@ -1392,10 +1392,10 @@ public class MainWindow {
 - [ ] **Step 5: Create empty stub `EditorToolBar.java`**
 
 ```java
-package com.pdfescroto.ui;
+package com.pdftapir.ui;
 
-import com.pdfescroto.command.UndoManager;
-import com.pdfescroto.model.PdfDocument;
+import com.pdftapir.command.UndoManager;
+import com.pdftapir.model.PdfDocument;
 import javafx.scene.Node;
 import javafx.scene.layout.HBox;
 
@@ -1410,10 +1410,10 @@ public class EditorToolBar {
 - [ ] **Step 6: Create empty stub `PdfCanvas.java`**
 
 ```java
-package com.pdfescroto.ui;
+package com.pdftapir.ui;
 
-import com.pdfescroto.command.UndoManager;
-import com.pdfescroto.model.PdfDocument;
+import com.pdftapir.command.UndoManager;
+import com.pdftapir.model.PdfDocument;
 import javafx.scene.canvas.Canvas;
 
 public class PdfCanvas extends Canvas {
@@ -1430,10 +1430,10 @@ public class PdfCanvas extends Canvas {
 - [ ] **Step 7: Create empty stub `PropertiesPanel.java`**
 
 ```java
-package com.pdfescroto.ui;
+package com.pdftapir.ui;
 
-import com.pdfescroto.command.UndoManager;
-import com.pdfescroto.model.Annotation;
+import com.pdftapir.command.UndoManager;
+import com.pdftapir.model.Annotation;
 import javafx.scene.Node;
 import javafx.scene.layout.VBox;
 
@@ -1451,8 +1451,8 @@ public class PropertiesPanel {
 - [ ] **Step 8: Add `Tool` enum**
 
 ```java
-// src/main/java/com/pdfescroto/ui/Tool.java
-package com.pdfescroto.ui;
+// src/main/java/com/pdftapir/ui/Tool.java
+package com.pdftapir.ui;
 
 public enum Tool { SELECT, TEXT, CHECKBOX, IMAGE }
 ```
@@ -1477,15 +1477,15 @@ git commit -m "feat: add MainWindow skeleton, stub UI components, Tool enum"
 ## Task 9: EditorToolBar
 
 **Files:**
-- Modify: `src/main/java/com/pdfescroto/ui/EditorToolBar.java`
+- Modify: `src/main/java/com/pdftapir/ui/EditorToolBar.java`
 
 - [ ] **Step 1: Replace stub with full implementation**
 
 ```java
-package com.pdfescroto.ui;
+package com.pdftapir.ui;
 
-import com.pdfescroto.command.UndoManager;
-import com.pdfescroto.model.PdfDocument;
+import com.pdftapir.command.UndoManager;
+import com.pdftapir.model.PdfDocument;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.*;
@@ -1584,7 +1584,7 @@ Expected: `BUILD SUCCESS`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/com/pdfescroto/ui/EditorToolBar.java
+git add src/main/java/com/pdftapir/ui/EditorToolBar.java
 git commit -m "feat: implement EditorToolBar with tool selection and page navigation"
 ```
 
@@ -1593,16 +1593,16 @@ git commit -m "feat: implement EditorToolBar with tool selection and page naviga
 ## Task 10: PropertiesPanel
 
 **Files:**
-- Modify: `src/main/java/com/pdfescroto/ui/PropertiesPanel.java`
+- Modify: `src/main/java/com/pdftapir/ui/PropertiesPanel.java`
 
 - [ ] **Step 1: Replace stub with full implementation**
 
 ```java
-package com.pdfescroto.ui;
+package com.pdftapir.ui;
 
-import com.pdfescroto.command.EditAnnotationCommand;
-import com.pdfescroto.command.UndoManager;
-import com.pdfescroto.model.*;
+import com.pdftapir.command.EditAnnotationCommand;
+import com.pdftapir.command.UndoManager;
+import com.pdftapir.model.*;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.*;
@@ -1778,7 +1778,7 @@ Expected: `BUILD SUCCESS`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/com/pdfescroto/ui/PropertiesPanel.java
+git add src/main/java/com/pdftapir/ui/PropertiesPanel.java
 git commit -m "feat: implement PropertiesPanel with annotation property editing"
 ```
 
@@ -1787,18 +1787,18 @@ git commit -m "feat: implement PropertiesPanel with annotation property editing"
 ## Task 11: PdfCanvas — Page Rendering
 
 **Files:**
-- Modify: `src/main/java/com/pdfescroto/ui/PdfCanvas.java`
+- Modify: `src/main/java/com/pdftapir/ui/PdfCanvas.java`
 
 Replace the stub with the full rendering implementation. Annotation interaction is added in Tasks 12-13.
 
 - [ ] **Step 1: Replace stub with rendering-capable implementation**
 
 ```java
-package com.pdfescroto.ui;
+package com.pdftapir.ui;
 
-import com.pdfescroto.command.UndoManager;
-import com.pdfescroto.model.*;
-import com.pdfescroto.service.CoordinateMapper;
+import com.pdftapir.command.UndoManager;
+import com.pdftapir.model.*;
+import com.pdftapir.service.CoordinateMapper;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.WritableImage;
@@ -1939,7 +1939,7 @@ public class PdfCanvas extends Canvas {
 
     public void deleteSelected() {
         if (selectedAnnotation == null || currentPage == null) return;
-        var cmd = new com.pdfescroto.command.DeleteAnnotationCommand(currentPage, selectedAnnotation);
+        var cmd = new com.pdftapir.command.DeleteAnnotationCommand(currentPage, selectedAnnotation);
         undoManager.execute(cmd);
         selectedAnnotation = null;
         propertiesPanel.showAnnotation(null);
@@ -2007,7 +2007,7 @@ git commit -m "feat: implement PdfCanvas page rendering with annotation drawing"
 ## Task 12: PdfCanvas — Mouse Interaction
 
 **Files:**
-- Modify: `src/main/java/com/pdfescroto/ui/PdfCanvas.java`
+- Modify: `src/main/java/com/pdftapir/ui/PdfCanvas.java`
 
 Override the three mouse handler methods to implement create, select, drag, and resize.
 
@@ -2097,7 +2097,7 @@ protected void onMouseReleased(double cx, double cy) {
             double oldX = getAnnotStartX(), oldY = getAnnotStartY();
             final var ann = selectedAnnotation;
             // Move already applied — wrap it so undo restores
-            getUndoManager().execute(new com.pdfescroto.command.EditAnnotationCommand(
+            getUndoManager().execute(new com.pdftapir.command.EditAnnotationCommand(
                     () -> { ann.setX(finalX); ann.setY(finalY); redraw(); },
                     () -> { ann.setX(oldX);   ann.setY(oldY);   redraw(); }
             ));
@@ -2109,7 +2109,7 @@ protected void onMouseReleased(double cx, double cy) {
         // Only add if large enough to be intentional
         if (ann.getWidth() > 2 && ann.getHeight() > 2) {
             var page = getCurrentPage();
-            getUndoManager().execute(new com.pdfescroto.command.AddAnnotationCommand(page, ann));
+            getUndoManager().execute(new com.pdftapir.command.AddAnnotationCommand(page, ann));
             setSelectedAnnotation(ann);
 
             // For image tool: open file chooser after creation
@@ -2201,7 +2201,7 @@ mvn javafx:run
 5. Select "↖ Select" tool → drag an annotation to move it
 6. Ctrl+Z → annotation should move back
 7. File → Save → reopen the file in another PDF viewer, confirm annotations visible
-8. Reopen the file in PDF Escroto → annotations should be re-editable
+8. Reopen the file in PDF Tapir → annotations should be re-editable
 
 - [ ] **Step 5: Run all tests**
 
@@ -2214,7 +2214,7 @@ Expected: `BUILD SUCCESS` (all tests pass)
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/java/com/pdfescroto/ui/PdfCanvas.java
+git add src/main/java/com/pdftapir/ui/PdfCanvas.java
 git commit -m "feat: implement PdfCanvas mouse interaction (create, select, move, delete)"
 ```
 

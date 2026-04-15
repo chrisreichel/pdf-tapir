@@ -13,14 +13,14 @@ PDFBox 3.x exposes these via:
 - `PDAnnotation.setAnnotationFlags(int)` / `getAnnotationFlags()`
 - `PDField.setFieldFlags(int)` / `getFieldFlags()` (for checkboxes)
 
-`PdfSaver` is the single write path for all pdf-escroto annotations. The fix is wholly contained there — no model or loader changes needed.
+`PdfSaver` is the single write path for all pdf-tapir annotations. The fix is wholly contained there — no model or loader changes needed.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - All three annotation types (free-text, rubber-stamp, widget) have `ReadOnly | Locked` flags set in the PDF on every save.
 - Checkbox AcroForm fields have the field-level `ReadOnly` flag set.
-- Opening the saved PDF in pdf-escroto still allows full editing (PDFBox ignores lock flags when reading; lock is re-applied on the next save).
+- Opening the saved PDF in pdf-tapir still allows full editing (PDFBox ignores lock flags when reading; lock is re-applied on the next save).
 
 **Non-Goals:**
 - PDF encryption / permissions passwords (a separate feature in `pdf-operations`).

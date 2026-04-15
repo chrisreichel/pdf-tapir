@@ -1,6 +1,6 @@
 ## Context
 
-pdf-escroto is a JavaFX desktop PDF editor built on PDFBox 3.x. Its current architecture has three layers:
+pdf-tapir is a JavaFX desktop PDF editor built on PDFBox 3.x. Its current architecture has three layers:
 - **Model**: `PdfDocument`, `PdfPage`, and annotation types
 - **Services**: `PdfLoader`, `PdfSaver`, `PdfRenderer`, `CoordinateMapper`
 - **UI**: `MainWindow`, `PdfCanvas`, `EditorToolBar`, `PropertiesPanel`
@@ -56,7 +56,7 @@ PDFBox `StandardProtectionPolicy` requires both an owner password and a user pas
 
 ### 4. Merge imports pages structurally (not flattened)
 
-`PDFMergerUtility` is used to copy pages at the PDFBox level. This preserves vector content, fonts, and images. Annotations from merged pages are NOT reconstructed as pdf-escroto annotation model objects — they remain as native PDF annotations that are visible but not interactively editable in the canvas.
+`PDFMergerUtility` is used to copy pages at the PDFBox level. This preserves vector content, fonts, and images. Annotations from merged pages are NOT reconstructed as pdf-tapir annotation model objects — they remain as native PDF annotations that are visible but not interactively editable in the canvas.
 
 **Alternative considered**: Flatten merged pages to images before inserting. Rejected because it degrades quality and loses text searchability.
 
@@ -74,5 +74,5 @@ After page removal the `PdfDocument` model (in-memory) is rebuilt from the mutat
 
 - **Large PDFs and merge**: PDFBox loads the entire merged document into memory. Very large source files may cause OOM. → Mitigation: document the memory trade-off; no streaming workaround in scope.
 - **Merge breaks undo history**: Merging pages resets the UndoManager (same as page removal). Users cannot undo a merge. → Mitigation: confirm dialog warns "This action cannot be undone."
-- **Page removal with annotations**: Removing a page that contains pdf-escroto annotations removes those annotations permanently. The model is consistent (page + annotations both removed) but the user cannot undo. → Same mitigation: confirm dialog.
+- **Page removal with annotations**: Removing a page that contains pdf-tapir annotations removes those annotations permanently. The model is consistent (page + annotations both removed) but the user cannot undo. → Same mitigation: confirm dialog.
 - **Re-encrypt changes password silently**: If a file was opened with password "A" and the user saves encrypted with password "B", there is no warning that the original password is being replaced. → Acceptable — the user explicitly chose to encrypt with a new password.

@@ -1,25 +1,25 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This is a Maven-based Java 21 desktop app for editing PDFs with JavaFX. Application code lives in `src/main/java/com/pdfescroto`, split by responsibility:
+This is a Maven-based Java 21 desktop app for editing PDFs with JavaFX. Application code lives in `src/main/java/com/pdftapir`, split by responsibility:
 
 - `ui/` for JavaFX windows, canvas, toolbar, and panels
 - `service/` for PDF loading, rendering, saving, and coordinate mapping
 - `model/` for document, page, and annotation types
 - `command/` for undoable actions
 
-Static assets live in `src/main/resources/com/pdfescroto/`, including `style.css`. Tests mirror the package layout under `src/test/java/com/pdfescroto`. Build output goes to `target/` and should not be committed.
+Static assets live in `src/main/resources/com/pdftapir/`, including `style.css`. Tests mirror the package layout under `src/test/java/com/pdftapir`. Build output goes to `target/` and should not be committed.
 
 ## Build, Test, and Development Commands
 - `mvn javafx:run` starts the JavaFX editor locally.
 - `mvn test` runs the JUnit 5 test suite.
 - `mvn package` compiles, tests, and builds the runnable JAR in `target/`.
-- `java -jar target/pdf-escroto-1.0.0-SNAPSHOT.jar` launches the packaged app after `mvn package`.
+- `java -jar target/pdf-tapir-1.0.0-SNAPSHOT.jar` launches the packaged app after `mvn package`.
 
 Use Java 21+ and Maven 3.8+ to match the project configuration in `pom.xml`.
 
 ## Coding Style & Naming Conventions
-Follow the existing Java style: 4-space indentation, braces on the same line, and clear package boundaries. Use `PascalCase` for classes and enums, `camelCase` for methods and fields, and lowercase package names such as `com.pdfescroto.ui`.
+Follow the existing Java style: 4-space indentation, braces on the same line, and clear package boundaries. Use `PascalCase` for classes and enums, `camelCase` for methods and fields, and lowercase package names such as `com.pdftapir.ui`.
 
 Keep UI classes focused on interaction and layout, and push PDF manipulation into `service/` or `command/`. Add brief Javadoc or inline comments only where behavior is not obvious.
 

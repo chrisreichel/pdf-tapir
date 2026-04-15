@@ -1,4 +1,4 @@
-# PDF Escroto — Visual PDF Editor Design
+# PDF Tapir — Visual PDF Editor Design
 
 **Date:** 2026-04-14  
 **Stack:** Java 21, JavaFX, Apache PDFBox, Maven  
@@ -8,7 +8,7 @@
 
 ## Overview
 
-PDF Escroto is an open source desktop application for visually annotating PDF files. Users can open a PDF, place text boxes, checkboxes, and images on top of pages, and save the result back to a PDF file. Annotations are stored as native PDF objects (free text annotations, AcroForm fields, stamp annotations) so they remain re-editable when the file is reopened in this tool.
+PDF Tapir is an open source desktop application for visually annotating PDF files. Users can open a PDF, place text boxes, checkboxes, and images on top of pages, and save the result back to a PDF file. Annotations are stored as native PDF objects (free text annotations, AcroForm fields, stamp annotations) so they remain re-editable when the file is reopened in this tool.
 
 ---
 
@@ -60,7 +60,7 @@ PdfDocument
 | Checkbox   | `PDCheckBox` (AcroForm widget)       | Yes         |
 | Image      | `PDAnnotationStamp` + `PDImageXObject` | Yes       |
 
-All annotations written by this tool include a custom `Contents` or `Subject` field tagged with `pdf-escroto` so `PdfLoader` can identify and reconstruct them on reopen.
+All annotations written by this tool include a custom `Contents` or `Subject` field tagged with `pdf-tapir` so `PdfLoader` can identify and reconstruct them on reopen.
 
 ### Undo / Redo
 

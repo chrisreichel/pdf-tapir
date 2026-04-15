@@ -1,6 +1,6 @@
 ## Why
 
-pdf-escroto currently only supports annotation workflows on existing PDFs. Users need document-level operations — encryption/decryption and structural editing (merging, page removal) — to manage their PDFs as first-class editing tasks rather than relying on external tools.
+pdf-tapir currently only supports annotation workflows on existing PDFs. Users need document-level operations — encryption/decryption and structural editing (merging, page removal) — to manage their PDFs as first-class editing tasks rather than relying on external tools.
 
 ## What Changes
 

@@ -48,16 +48,16 @@ jobs:
 
       - name: Copy app JAR into target/lib
         shell: bash
-        run: cp target/pdf-escroto-${{ env.VERSION }}.jar target/lib/
+        run: cp target/pdf-tapir-${{ env.VERSION }}.jar target/lib/
 
       - name: Run jpackage
         shell: bash
         run: |
           jpackage \
             --input target/lib/ \
-            --main-jar pdf-escroto-${{ env.VERSION }}.jar \
-            --main-class com.pdfescroto.PdfEscrotoApp \
-            --name "PDF Escroto" \
+            --main-jar pdf-tapir-${{ env.VERSION }}.jar \
+            --main-class com.pdftapir.PdfTapirApp \
+            --name "PDF Tapir" \
             --app-version ${{ env.VERSION }} \
             --icon ${{ matrix.icon }} \
             --type ${{ matrix.jpackage-type }} \

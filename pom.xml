@@ -4,8 +4,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.pdfescroto</groupId>
-    <artifactId>pdf-escroto</artifactId>
+    <groupId>com.pdftapir</groupId>
+    <artifactId>pdf-tapir</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
@@ -48,7 +48,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>com.pdfescroto.PdfEscrotoApp</mainClass>
+                    <mainClass>com.pdftapir.PdfTapirApp</mainClass>
                 </configuration>
             </plugin>
             <plugin>
