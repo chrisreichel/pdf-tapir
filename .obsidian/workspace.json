@@ -1,0 +1,221 @@
+{
+  "main": {
+    "id": "fe6ef0084a5a0825",
+    "type": "split",
+    "children": [
+      {
+        "id": "189bae1dbbee442e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "8f2dd35943e7f1d6",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "3cd10fc4b94d0aff",
+    "type": "split",
+    "children": [
+      {
+        "id": "d1a22f223fbd470a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "603d5b9470f762a2",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "5c18d2cdf6f926cf",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "a43de4afce37dfc0",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "a07f39b749392ff0",
+    "type": "split",
+    "children": [
+      {
+        "id": "712dad9e4e6d29d8",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7148bb82c7407af6",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "c520517bf9c21344",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "2642cfa8be4fe1b7",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "e7e59f82cbf3a0ea",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "d03de4d1c349dd6c",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "8f2dd35943e7f1d6",
+  "lastOpenFiles": [
+    "openspec/changes/close-and-print/tasks.md",
+    "target/pdf-tapir-1.0.0.jar",
+    "target/maven-archiver/pom.properties",
+    "target/maven-archiver",
+    "target/lib/pdfbox-io-3.0.2.jar",
+    "target/lib/pdfbox-3.0.2.jar",
+    "target/lib/javafx-swing-21.0.4.jar",
+    "target/lib/javafx-swing-21.0.4-mac-aarch64.jar",
+    "target/lib/javafx-graphics-21.0.4.jar",
+    "target/lib/javafx-graphics-21.0.4-mac-aarch64.jar",
+    "target/lib/javafx-controls-21.0.4.jar",
+    "openspec/changes/close-and-print/specs/print-pdf/spec.md",
+    "openspec/changes/close-and-print/specs/close-file/spec.md",
+    "openspec/changes/close-and-print/design.md",
+    "openspec/changes/close-and-print/proposal.md",
+    "openspec/changes/archive/2026-04-15-annotation-formatting-enhancements/specs/text-annotation-formatting/spec.md",
+    "openspec/changes/archive/2026-04-15-annotation-formatting-enhancements/specs/checkbox-borderless-mode/spec.md",
+    "openspec/changes/archive/2026-04-15-annotation-formatting-enhancements/specs/about-screen-version/spec.md",
+    "openspec/changes/archive/2026-04-15-annotation-formatting-enhancements/tasks.md",
+    "openspec/changes/archive/2026-04-15-annotation-formatting-enhancements/proposal.md",
+    "openspec/changes/archive/2026-04-15-annotation-formatting-enhancements/design.md",
+    "openspec/specs/about-screen-version/spec.md",
+    "openspec/specs/checkbox-borderless-mode/spec.md",
+    "openspec/specs/text-annotation-formatting/spec.md",
+    "openspec/changes/annotation-formatting-enhancements/tasks.md",
+    "openspec/changes/about-dialog/tasks.md",
+    "openspec/changes/jpackage-distribution/tasks.md",
+    "openspec/changes/archive/2026-04-15-jpackage-distribution/specs/native-installers/spec.md",
+    "openspec/changes/archive/2026-04-15-jpackage-distribution/specs/release-pipeline/spec.md",
+    "openspec/changes/archive/2026-04-15-jpackage-distribution/design.md",
+    "openspec/changes/archive/2026-04-15-jpackage-distribution/tasks.md",
+    "openspec/changes/archive/2026-04-15-jpackage-distribution/proposal.md",
+    "openspec/specs/release-pipeline/spec.md",
+    "openspec/specs/native-installers/spec.md",
+    "target/classes/ICON.png",
+    "packaging/icons/ICON.png",
+    "openspec/changes/jpackage-distribution/specs/release-pipeline/spec.md",
+    "openspec/changes/jpackage-distribution/specs/native-installers/spec.md",
+    "src/main/resources/ICON.png"
+  ]
+}

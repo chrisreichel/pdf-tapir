@@ -1,4 +1,4 @@
-# PDF Escroto
+# PDF Tapir
 
 An open source visual PDF editor. Open a PDF, place text boxes, checkboxes, and images on top of pages, and save the result back to the file. Annotations are stored as native PDF objects so they remain re-editable when the file is reopened.
 
@@ -17,7 +17,7 @@ mvn javafx:run
 
 ```bash
 mvn package
-java -jar target/pdf-escroto-1.0.0-SNAPSHOT.jar
+java -jar target/pdf-tapir-1.0.0-SNAPSHOT.jar
 ```
 
 ## Test
