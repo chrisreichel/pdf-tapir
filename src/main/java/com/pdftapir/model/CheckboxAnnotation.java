@@ -7,6 +7,7 @@ public class CheckboxAnnotation extends Annotation {
     private String  label          = "";
     private boolean checked        = false;
     private String  checkmarkColor = "#000000";
+    private boolean borderless     = false;
 
     /**
      * Creates a CheckboxAnnotation with the given bounding rectangle.
@@ -37,4 +38,10 @@ public class CheckboxAnnotation extends Annotation {
 
     /** Sets the checkmark color as a CSS hex string (e.g. {@code "#000000"}). */
     public void    setCheckmarkColor(String c) { this.checkmarkColor = c; }
+
+    /** Returns {@code true} if the border rectangle is hidden, showing only the checkmark. */
+    public boolean isBorderless()              { return borderless; }
+
+    /** Sets whether the border rectangle is hidden. */
+    public void    setBorderless(boolean b)    { this.borderless = b; }
 }

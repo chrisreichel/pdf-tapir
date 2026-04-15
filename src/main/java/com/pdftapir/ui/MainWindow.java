@@ -6,6 +6,7 @@ import com.pdftapir.service.PdfEncryptionService;
 import com.pdftapir.service.PdfLoader;
 import com.pdftapir.service.PdfMergeService;
 import com.pdftapir.service.PdfPageService;
+import com.pdftapir.service.PdfFlattenExporter;
 import com.pdftapir.service.PdfSaver;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -38,6 +39,7 @@ public class MainWindow {
     private final UndoManager           undoManager        = new UndoManager(50);
     private final PdfLoader             loader             = new PdfLoader();
     private final PdfSaver              saver              = new PdfSaver();
+    private final PdfFlattenExporter    flattenExporter    = new PdfFlattenExporter();
     private final PdfEncryptionService  encryptionService  = new PdfEncryptionService();
     private final PdfMergeService       mergeService       = new PdfMergeService();
     private final PdfPageService        pageService        = new PdfPageService();
@@ -71,18 +73,21 @@ public class MainWindow {
     }
 
     private MenuBar buildMenuBar() {
-        var openItem   = new MenuItem("Open\u2026");
-        var saveItem   = new MenuItem("Save");
-        var saveAsItem = new MenuItem("Save As\u2026");
-        var exitItem   = new MenuItem("Exit");
+        var openItem          = new MenuItem("Open\u2026");
+        var saveItem          = new MenuItem("Save");
+        var saveAsItem        = new MenuItem("Save As\u2026");
+        var exportFlatItem    = new MenuItem("Export Flattened PDF\u2026");
+        var exitItem          = new MenuItem("Exit");
 
         openItem.setOnAction(e -> openFile());
         saveItem.setOnAction(e -> saveFile(false));
         saveAsItem.setOnAction(e -> saveFile(true));
+        exportFlatItem.setOnAction(e -> exportFlattenedPdf());
         exitItem.setOnAction(e -> Platform.exit());
 
-        var fileMenu = new Menu("File", null, openItem, saveItem, saveAsItem,
+        var fileMenu = new Menu("File", null, openItem, saveItem, saveAsItem, exportFlatItem,
                 new SeparatorMenuItem(), exitItem);
+        fileMenu.setOnShowing(e -> exportFlatItem.setDisable(openDocument == null));
 
         var undoItem = new MenuItem("Undo");
         var redoItem = new MenuItem("Redo");
@@ -271,6 +276,39 @@ public class MainWindow {
         new Thread(task, "pdf-saver").start();
     }
 
+    private void exportFlattenedPdf() {
+        if (openDocument == null) return;
+
+        var alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Export Flattened PDF");
+        alert.setHeaderText("Export a read-only copy of this document?");
+        alert.setContentText(
+                "The exported file will have all annotations burned in permanently " +
+                "and cannot be re-edited in PDF Tapir. " +
+                "Your current document will remain open and editable.");
+        alert.getButtonTypes().setAll(new ButtonType("Export Flattened PDF"), ButtonType.CANCEL);
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isEmpty() || result.get() == ButtonType.CANCEL) return;
+
+        var chooser = new FileChooser();
+        chooser.setTitle("Export Flattened PDF");
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+        File target = chooser.showSaveDialog(primaryStage);
+        if (target == null) return;
+
+        final File finalTarget = target;
+        var task = new Task<Void>() {
+            @Override protected Void call() throws Exception {
+                flattenExporter.export(openDocument, finalTarget);
+                return null;
+            }
+        };
+        task.setOnFailed(e -> showError("Export failed", task.getException()));
+        new Thread(task, "pdf-flatten-exporter").start();
+    }
+
     // -------------------------------------------------------------------------
     // Document operations
     // -------------------------------------------------------------------------
@@ -290,13 +328,9 @@ public class MainWindow {
         String password = passwordField.getText();
         if (result.isEmpty() || password.isEmpty()) return;
 
-        try {
-            encryptionService.encrypt(openDocument.getPdDocument(), password);
-            openDocument.setEncrypted(true);
-            saveFile(false);
-        } catch (Exception e) {
-            showError("Encryption failed", e);
-        }
+        openDocument.setPendingPassword(password);
+        openDocument.setEncrypted(true);
+        saveFile(false);
     }
 
     private void decryptDocument() {

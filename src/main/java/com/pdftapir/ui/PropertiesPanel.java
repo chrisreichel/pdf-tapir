@@ -6,6 +6,7 @@ import com.pdftapir.model.*;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 
@@ -25,15 +26,22 @@ public class PropertiesPanel {
     private final TextField hField = new TextField();
 
     // Text-only section
-    private final TextField    textField      = new TextField();
-    private final TextField    fontField      = new TextField();
-    private final ColorPicker  textColorPicker = new ColorPicker(Color.BLACK);
-    private final ComboBox<String> fontFamilyBox  = new ComboBox<>();
-    private final VBox         textSection    = new VBox(4);
+    private final TextField        textField       = new TextField();
+    private final TextField        fontField       = new TextField();
+    private final ColorPicker      textColorPicker = new ColorPicker(Color.BLACK);
+    private final ComboBox<String> fontFamilyBox   = new ComboBox<>();
+    private final CheckBox         boldBox         = new CheckBox("Bold");
+    private final CheckBox         italicBox       = new CheckBox("Italic");
+    private final ToggleButton     alignLeftBtn    = new ToggleButton("L");
+    private final ToggleButton     alignCenterBtn  = new ToggleButton("C");
+    private final ToggleButton     alignRightBtn   = new ToggleButton("R");
+    private final ToggleGroup      alignGroup      = new ToggleGroup();
+    private final VBox             textSection     = new VBox(4);
 
     // Checkbox-only section
     private final TextField   labelField    = new TextField();
     private final CheckBox    checkedBox    = new CheckBox("Checked");
+    private final CheckBox    borderlessBox = new CheckBox("Borderless");
     private final ColorPicker cbColorPicker = new ColorPicker(Color.BLACK);
     private final VBox        cbSection     = new VBox(4);
 
@@ -45,19 +53,32 @@ public class PropertiesPanel {
         node.setPadding(new Insets(10));
         fontFamilyBox.getItems().addAll(
                 "System", "Arial", "Times New Roman", "Courier New", "Georgia", "Verdana");
+        alignLeftBtn.setToggleGroup(alignGroup);
+        alignCenterBtn.setToggleGroup(alignGroup);
+        alignRightBtn.setToggleGroup(alignGroup);
+        alignLeftBtn.setUserData("LEFT");
+        alignCenterBtn.setUserData("CENTER");
+        alignRightBtn.setUserData("RIGHT");
         buildLayout();
         showAnnotation(null);
     }
 
     private void buildLayout() {
+        var styleRow  = new HBox(6, boldBox, italicBox);
+        var alignRow  = new HBox(2, alignLeftBtn, alignCenterBtn, alignRightBtn);
+
         textSection.getChildren().addAll(
                 label("Text"), textField,
                 label("Font size"), fontField,
                 label("Font color"), textColorPicker,
-                label("Font family"), fontFamilyBox);
+                label("Font family"), fontFamilyBox,
+                styleRow,
+                label("Alignment"), alignRow);
+
         cbSection.getChildren().addAll(
                 label("Label"), labelField,
                 checkedBox,
+                borderlessBox,
                 label("Checkmark color"), cbColorPicker);
 
         node.getChildren().addAll(
@@ -119,6 +140,38 @@ public class PropertiesPanel {
                     () -> { ta.setFontFamily(old); onRedraw.run(); }));
         });
 
+        // Bold
+        boldBox.setOnAction(e -> {
+            if (!(current instanceof TextAnnotation ta)) return;
+            boolean nw  = boldBox.isSelected();
+            boolean old = !nw;
+            undoManager.execute(new EditAnnotationCommand(
+                    () -> { ta.setBold(nw);  onRedraw.run(); },
+                    () -> { ta.setBold(old); onRedraw.run(); }));
+        });
+
+        // Italic
+        italicBox.setOnAction(e -> {
+            if (!(current instanceof TextAnnotation ta)) return;
+            boolean nw  = italicBox.isSelected();
+            boolean old = !nw;
+            undoManager.execute(new EditAnnotationCommand(
+                    () -> { ta.setItalic(nw);  onRedraw.run(); },
+                    () -> { ta.setItalic(old); onRedraw.run(); }));
+        });
+
+        // Alignment
+        alignGroup.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+            if (!(current instanceof TextAnnotation ta)) return;
+            if (newToggle == null) return;
+            String nw  = (String) newToggle.getUserData();
+            String old = ta.getTextAlign();
+            if (nw.equals(old)) return;
+            undoManager.execute(new EditAnnotationCommand(
+                    () -> { ta.setTextAlign(nw);  onRedraw.run(); },
+                    () -> { ta.setTextAlign(old); onRedraw.run(); }));
+        });
+
         // Checkbox label
         commitOnChange(labelField, () -> {
             if (!(current instanceof CheckboxAnnotation ca)) return;
@@ -138,6 +191,16 @@ public class PropertiesPanel {
             undoManager.execute(new EditAnnotationCommand(
                     () -> { ca.setChecked(nw);  onRedraw.run(); },
                     () -> { ca.setChecked(old); onRedraw.run(); }));
+        });
+
+        // Borderless
+        borderlessBox.setOnAction(e -> {
+            if (!(current instanceof CheckboxAnnotation ca)) return;
+            boolean nw  = borderlessBox.isSelected();
+            boolean old = !nw;
+            undoManager.execute(new EditAnnotationCommand(
+                    () -> { ca.setBorderless(nw);  onRedraw.run(); },
+                    () -> { ca.setBorderless(old); onRedraw.run(); }));
         });
 
         // Checkmark color
@@ -179,14 +242,18 @@ public class PropertiesPanel {
             fontField.setText(String.valueOf((int) ta.getFontSize()));
             textColorPicker.setValue(parseColor(ta.getFontColor()));
             String family = ta.getFontFamily();
-            if (fontFamilyBox.getItems().contains(family)) {
-                fontFamilyBox.setValue(family);
-            } else {
-                fontFamilyBox.setValue("System");
-            }
+            fontFamilyBox.setValue(fontFamilyBox.getItems().contains(family) ? family : "System");
+            boldBox.setSelected(ta.isBold());
+            italicBox.setSelected(ta.isItalic());
+            String align = ta.getTextAlign() == null ? "LEFT" : ta.getTextAlign();
+            alignGroup.getToggles().stream()
+                    .filter(t -> align.equals(t.getUserData()))
+                    .findFirst()
+                    .ifPresent(t -> alignGroup.selectToggle(t));
         } else if (a instanceof CheckboxAnnotation ca) {
             labelField.setText(ca.getLabel());
             checkedBox.setSelected(ca.isChecked());
+            borderlessBox.setSelected(ca.isBorderless());
             cbColorPicker.setValue(parseColor(ca.getCheckmarkColor()));
         }
     }

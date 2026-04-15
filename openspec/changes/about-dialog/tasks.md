@@ -18,7 +18,7 @@
 
 ## 3. Verify
 
-- [ ] 3.1 Run `mvn javafx:run`, open Help → About PDF Tapir… and confirm all fields display correctly
-- [ ] 3.2 Confirm the URL hyperlink opens the browser
-- [ ] 3.3 Confirm the Close button dismisses the dialog and focus returns to the main window
+- [x] 3.1 Run `mvn javafx:run`, open Help → About PDF Tapir… and confirm all fields display correctly
+- [x] 3.2 Confirm the URL hyperlink opens the browser
+- [x] 3.3 Confirm the Close button dismisses the dialog and focus returns to the main window
 - [x] 3.4 Run `mvn test` and confirm all existing tests still pass

@@ -20,6 +20,8 @@ public class PdfDocument implements AutoCloseable {
     private       File          sourceFile;
     private       boolean       encrypted;
     private       byte[]        cleanBasePdfBytes;
+    /** Password to apply on the next save, then cleared. {@code null} means no pending encryption. */
+    private       String        pendingPassword;
 
     /**
      * Creates a PdfDocument wrapping the given PDFBox document.
@@ -67,6 +69,12 @@ public class PdfDocument implements AutoCloseable {
     public void setCleanBasePdfBytes(byte[] bytes) {
         this.cleanBasePdfBytes = bytes == null ? null : java.util.Arrays.copyOf(bytes, bytes.length);
     }
+
+    /** Returns the password to be applied on the next save, or {@code null} if none is pending. */
+    public String getPendingPassword()           { return pendingPassword; }
+
+    /** Sets a password to be applied on the next save (cleared by {@link com.pdftapir.service.PdfSaver} after saving). */
+    public void   setPendingPassword(String pwd) { this.pendingPassword = pwd; }
 
     /**
      * Replaces the entire page list in-place. Used by merge and page-removal services

@@ -3,6 +3,8 @@ package com.pdftapir.service;
 import com.pdftapir.model.*;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.encryption.AccessPermission;
+import org.apache.pdfbox.pdmodel.encryption.StandardProtectionPolicy;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotation;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationMarkup;
 
@@ -57,8 +59,17 @@ public class PdfSaver {
         try (var flatDoc = Loader.loadPDF(basePdfBytes)) {
             flattener.flatten(flatDoc, document);
             packageService.write(flatDoc, basePdfBytes, document.getPages());
+            String pwd = document.getPendingPassword();
+            if (pwd != null) {
+                var policy = new StandardProtectionPolicy(pwd, pwd, new AccessPermission());
+                policy.setEncryptionKeyLength(256);
+                flatDoc.protect(policy);
+            }
             flatDoc.save(tmp);
             Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            if (pwd != null) {
+                document.setPendingPassword(null);
+            }
         } catch (IOException e) {
             tmp.delete();
             throw e;

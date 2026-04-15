@@ -87,11 +87,15 @@ class PdfTapirPackageService {
                     props.setProperty(prefix + "fontSize", Float.toString(ta.getFontSize()));
                     props.setProperty(prefix + "fontColor", nullToEmpty(ta.getFontColor()));
                     props.setProperty(prefix + "fontFamily", b64(ta.getFontFamily()));
+                    props.setProperty(prefix + "bold", Boolean.toString(ta.isBold()));
+                    props.setProperty(prefix + "italic", Boolean.toString(ta.isItalic()));
+                    props.setProperty(prefix + "textAlign", nullToEmpty(ta.getTextAlign()));
                 } else if (annotation instanceof CheckboxAnnotation ca) {
                     props.setProperty(prefix + "type", "checkbox");
                     props.setProperty(prefix + "label", b64(ca.getLabel()));
                     props.setProperty(prefix + "checked", Boolean.toString(ca.isChecked()));
                     props.setProperty(prefix + "checkmarkColor", nullToEmpty(ca.getCheckmarkColor()));
+                    props.setProperty(prefix + "borderless", Boolean.toString(ca.isBorderless()));
                 } else if (annotation instanceof ImageAnnotation ia) {
                     props.setProperty(prefix + "type", "image");
                     byte[] imageData = ia.getImageData();
@@ -140,6 +144,9 @@ class PdfTapirPackageService {
         ta.setFontSize(parseFloat(props.getProperty(prefix + "fontSize"), 12f));
         ta.setFontColor(props.getProperty(prefix + "fontColor", "#000000"));
         ta.setFontFamily(unb64(props.getProperty(prefix + "fontFamily", b64("System"))));
+        ta.setBold(Boolean.parseBoolean(props.getProperty(prefix + "bold", "false")));
+        ta.setItalic(Boolean.parseBoolean(props.getProperty(prefix + "italic", "false")));
+        ta.setTextAlign(props.getProperty(prefix + "textAlign", "LEFT"));
         return ta;
     }
 
@@ -149,6 +156,7 @@ class PdfTapirPackageService {
         ca.setLabel(unb64(props.getProperty(prefix + "label", "")));
         ca.setChecked(Boolean.parseBoolean(props.getProperty(prefix + "checked", "false")));
         ca.setCheckmarkColor(props.getProperty(prefix + "checkmarkColor", "#000000"));
+        ca.setBorderless(Boolean.parseBoolean(props.getProperty(prefix + "borderless", "false")));
         return ca;
     }
 

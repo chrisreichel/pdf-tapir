@@ -19,6 +19,9 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.scene.text.FontPosture;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.TextAlignment;
 
 /**
  * Canvas that renders the current PDF page image and overlays interactive
@@ -116,15 +119,47 @@ public class PdfCanvas extends Canvas {
             gc.strokeRect(cx, cy, cw, ch);
             // Skip text rendering when inline editor is active for this annotation
             if (ta != activeInlineAnnotation) {
+                FontWeight weight = ta.isBold() ? FontWeight.BOLD : FontWeight.NORMAL;
+                double     fontSize   = ta.getFontSize() * scale.get();
+                double     lineHeight = fontSize * 1.2;
                 gc.setFill(Color.web(ta.getFontColor()));
-                gc.setFont(Font.font(ta.getFontFamily(), ta.getFontSize() * scale.get()));
-                gc.fillText(ta.getText(), cx + 3, cy + ta.getFontSize() * scale.get(), cw - 6);
+                gc.setFont(Font.font(ta.getFontFamily(), weight, FontPosture.REGULAR, fontSize));
+                String align = ta.getTextAlign() == null ? "LEFT" : ta.getTextAlign();
+                gc.setTextAlign(switch (align) {
+                    case "CENTER" -> TextAlignment.CENTER;
+                    case "RIGHT"  -> TextAlignment.RIGHT;
+                    default       -> TextAlignment.LEFT;
+                });
+                double lineX = switch (align) {
+                    case "CENTER" -> cx + cw / 2.0;
+                    case "RIGHT"  -> cx + cw - 3;
+                    default       -> cx + 3;
+                };
+                String[] lines = ta.getText().split("\\R", -1);
+                for (int i = 0; i < lines.length; i++) {
+                    double lineY = cy + fontSize + i * lineHeight;
+                    if (ta.isItalic()) {
+                        // Synthesize italic via horizontal shear anchored at the text baseline.
+                        // Font.font() with FontPosture.ITALIC is unreliable for "System" and
+                        // other families that lack a registered italic variant on the platform.
+                        gc.save();
+                        double shear = 0.25;
+                        gc.transform(1, 0, -shear, 1, shear * lineY, 0);
+                    }
+                    gc.fillText(lines[i], lineX, lineY);
+                    if (ta.isItalic()) {
+                        gc.restore();
+                    }
+                }
+                gc.setTextAlign(TextAlignment.LEFT);
             }
 
         } else if (a instanceof CheckboxAnnotation ca) {
-            gc.setStroke(selected ? Color.DODGERBLUE : Color.rgb(46, 125, 50, 0.9));
-            gc.setLineWidth(selected ? 2.0 : 1.5);
-            gc.strokeRect(cx, cy, cw, ch);
+            if (!ca.isBorderless() || selected) {
+                gc.setStroke(selected ? Color.DODGERBLUE : Color.rgb(46, 125, 50, 0.9));
+                gc.setLineWidth(selected ? 2.0 : 1.5);
+                gc.strokeRect(cx, cy, cw, ch);
+            }
             if (ca.isChecked()) {
                 gc.setStroke(Color.web(ca.getCheckmarkColor()));
                 gc.setLineWidth(2.0);

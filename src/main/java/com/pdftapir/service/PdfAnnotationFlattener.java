@@ -5,6 +5,7 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 
 import java.io.IOException;
@@ -15,8 +16,10 @@ import java.io.IOException;
  */
 class PdfAnnotationFlattener {
 
-    private static final PDType1Font HELVETICA =
-            new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+    private static final PDType1Font HELVETICA             = new PDType1Font(FontName.HELVETICA);
+    private static final PDType1Font HELVETICA_BOLD        = new PDType1Font(FontName.HELVETICA_BOLD);
+    private static final PDType1Font HELVETICA_OBLIQUE     = new PDType1Font(FontName.HELVETICA_OBLIQUE);
+    private static final PDType1Font HELVETICA_BOLD_OBLIQUE = new PDType1Font(FontName.HELVETICA_BOLD_OBLIQUE);
 
     void flatten(PDDocument targetDocument, PdfDocument sourceDocument) throws IOException {
         for (var page : sourceDocument.getPages()) {
@@ -37,20 +40,53 @@ class PdfAnnotationFlattener {
     }
 
     private void drawText(PDPageContentStream content, TextAnnotation ta) throws IOException {
-        content.saveGraphicsState();
+        PDType1Font font     = pickFont(ta.isBold(), ta.isItalic());
+        float       fontSize = ta.getFontSize();
+        float       annotX   = (float) ta.getX();
+        float       annotY   = (float) ta.getY();
+        float       annotW   = (float) ta.getWidth();
+        float       annotH   = (float) ta.getHeight();
+        String      align    = ta.getTextAlign() == null ? "LEFT" : ta.getTextAlign();
+        float       leading  = fontSize * 1.2f;
+        String[]    lines    = safeText(ta.getText()).split("\\R", -1);
+
         float[] rgb = parseRgb(ta.getFontColor());
+        content.saveGraphicsState();
         content.setNonStrokingColor(rgb[0], rgb[1], rgb[2]);
-        content.beginText();
-        content.setFont(HELVETICA, ta.getFontSize());
-        content.setLeading(ta.getFontSize() * 1.2f);
-        content.newLineAtOffset((float) ta.getX() + 3f,
-                (float) (ta.getY() + ta.getHeight() - ta.getFontSize()));
-        for (String line : safeText(ta.getText()).split("\\R", -1)) {
+
+        for (int i = 0; i < lines.length; i++) {
+            String line  = lines[i];
+            float lineW  = safeStringWidth(font, line, fontSize);
+            float lineX  = switch (align) {
+                case "CENTER" -> annotX + (annotW - lineW) / 2f;
+                case "RIGHT"  -> annotX + annotW - lineW - 3f;
+                default       -> annotX + 3f;
+            };
+            float lineY  = annotY + annotH - fontSize - (i * leading);
+
+            content.beginText();
+            content.setFont(font, fontSize);
+            content.newLineAtOffset(lineX, lineY);
             content.showText(line);
-            content.newLine();
+            content.endText();
         }
-        content.endText();
+
         content.restoreGraphicsState();
+    }
+
+    private PDType1Font pickFont(boolean bold, boolean italic) {
+        if (bold && italic) return HELVETICA_BOLD_OBLIQUE;
+        if (bold)           return HELVETICA_BOLD;
+        if (italic)         return HELVETICA_OBLIQUE;
+        return HELVETICA;
+    }
+
+    private float safeStringWidth(PDType1Font font, String text, float fontSize) {
+        try {
+            return font.getStringWidth(text) / 1000f * fontSize;
+        } catch (Exception e) {
+            return 0f;
+        }
     }
 
     private void drawCheckbox(PDPageContentStream content, CheckboxAnnotation ca) throws IOException {
@@ -60,10 +96,12 @@ class PdfAnnotationFlattener {
         float h = (float) ca.getHeight();
 
         content.saveGraphicsState();
-        content.setStrokingColor(0f, 0f, 0f);
-        content.setLineWidth(1f);
-        content.addRect(x, y, w, h);
-        content.stroke();
+        if (!ca.isBorderless()) {
+            content.setStrokingColor(0f, 0f, 0f);
+            content.setLineWidth(1f);
+            content.addRect(x, y, w, h);
+            content.stroke();
+        }
 
         if (ca.isChecked()) {
             float[] rgb = parseRgb(ca.getCheckmarkColor());

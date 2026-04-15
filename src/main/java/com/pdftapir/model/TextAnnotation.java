@@ -5,10 +5,13 @@ package com.pdftapir.model;
  * Supports configurable font size and color.
  */
 public class TextAnnotation extends Annotation {
-    private String text       = "";
-    private float  fontSize   = 12f;
-    private String fontColor  = "#000000";
-    private String fontFamily = "System";
+    private String  text       = "";
+    private float   fontSize   = 12f;
+    private String  fontColor  = "#000000";
+    private String  fontFamily = "System";
+    private boolean bold       = false;
+    private boolean italic     = false;
+    private String  textAlign  = "LEFT";
 
     /**
      * Creates a TextAnnotation with the given bounding rectangle.
@@ -45,4 +48,22 @@ public class TextAnnotation extends Annotation {
 
     /** Sets the font family name (e.g. {@code "Arial"}). */
     public void   setFontFamily(String f) { this.fontFamily = f; }
+
+    /** Returns {@code true} if the text is rendered bold. */
+    public boolean isBold()              { return bold; }
+
+    /** Sets bold rendering for this annotation. */
+    public void    setBold(boolean b)    { this.bold = b; }
+
+    /** Returns {@code true} if the text is rendered italic. */
+    public boolean isItalic()            { return italic; }
+
+    /** Sets italic rendering for this annotation. */
+    public void    setItalic(boolean i)  { this.italic = i; }
+
+    /** Returns the text alignment: {@code "LEFT"}, {@code "CENTER"}, or {@code "RIGHT"}. */
+    public String  getTextAlign()             { return textAlign; }
+
+    /** Sets the text alignment: {@code "LEFT"}, {@code "CENTER"}, or {@code "RIGHT"}. */
+    public void    setTextAlign(String align) { this.textAlign = align; }
 }

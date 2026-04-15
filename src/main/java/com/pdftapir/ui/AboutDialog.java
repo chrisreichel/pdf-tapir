@@ -18,6 +18,7 @@ import javafx.stage.Window;
 
 import java.awt.Desktop;
 import java.net.URI;
+import java.util.Properties;
 
 /**
  * Modal About dialog showing project identity, authorship, license, and
@@ -47,6 +48,10 @@ public class AboutDialog {
         // ── App name ──────────────────────────────────────────────────────────
         var nameLabel = new Label("PDF Tapir");
         nameLabel.setFont(Font.font(null, FontWeight.BOLD, 22));
+
+        // ── Version ───────────────────────────────────────────────────────────
+        var versionLabel = new Label(readVersion());
+        versionLabel.setStyle("-fx-text-fill: -fx-text-base-color; -fx-font-size: 12;");
 
         // ── URL hyperlink ─────────────────────────────────────────────────────
         var urlLink = new Hyperlink("https://github.com/chrisreichel/pdf-tapir");
@@ -91,6 +96,7 @@ public class AboutDialog {
         var content = new VBox(12,
                 iconView,
                 nameLabel,
+                versionLabel,
                 urlLink,
                 developerLabel,
                 licenseLabel,
@@ -102,5 +108,16 @@ public class AboutDialog {
 
         stage.setScene(new Scene(content));
         stage.showAndWait();
+    }
+
+    private String readVersion() {
+        try (var in = getClass().getResourceAsStream("/com/pdftapir/build.properties")) {
+            if (in == null) return "";
+            var props = new Properties();
+            props.load(in);
+            return props.getProperty("version", "");
+        } catch (Exception e) {
+            return "";
+        }
     }
 }
