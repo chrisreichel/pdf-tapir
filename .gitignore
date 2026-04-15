@@ -6,3 +6,5 @@ target/
 .claude/
 .gemini/
 .codex/
+.opencode/
+.obsidian/
