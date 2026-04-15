@@ -131,4 +131,4 @@ Use the **◀ ▶** buttons in the toolbar to move between pages.
 
 ## License
 
-MIT
+AGPL-3.0
