@@ -54,8 +54,9 @@ public class PdfSaver {
             document.setCleanBasePdfBytes(basePdfBytes);
         }
 
-        // Atomic write: save to temp file then rename over target
-        var tmp = File.createTempFile("ptapir-", ".pdf", target.getParentFile());
+        // Write to a system temp file, then move over the target
+        var tmp = java.nio.file.Files.createTempFile("ptapir-", ".pdf").toFile();
+        tmp.deleteOnExit(); // safety net in case of crash
         try (var flatDoc = Loader.loadPDF(basePdfBytes)) {
             flattener.flatten(flatDoc, document);
             packageService.write(flatDoc, basePdfBytes, document.getPages());

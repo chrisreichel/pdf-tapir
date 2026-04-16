@@ -25,12 +25,15 @@ import javax.swing.SwingUtilities;
 import java.awt.print.PrinterException;
 import java.awt.print.PrinterJob;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.printing.PDFPageable;
 
 /**
@@ -326,22 +329,32 @@ public class MainWindow {
 
     private void printDocument() {
         if (openDocument == null) return;
-        var pdDoc = openDocument.getPdDocument();
-        SwingUtilities.invokeLater(() -> {
-            try {
-                var printerJob = PrinterJob.getPrinterJob();
-                printerJob.setPageable(new PDFPageable(pdDoc));
-                if (printerJob.printDialog()) {
-                    try {
-                        printerJob.print();
-                    } catch (PrinterException ex) {
-                        Platform.runLater(() -> showError("Print failed", ex));
-                    }
-                }
-            } catch (Exception ex) {
-                Platform.runLater(() -> showError("Print failed", ex));
+        // Flatten annotations to a temp PDF on a background thread, then print
+        var flattenTask = new Task<Path>() {
+            @Override protected Path call() throws Exception {
+                return flattenExporter.flattenToTemp(openDocument);
             }
+        };
+        flattenTask.setOnSucceeded(e -> {
+            Path tmp = flattenTask.getValue();
+            SwingUtilities.invokeLater(() -> {
+                try (var flatDoc = Loader.loadPDF(tmp.toFile())) {
+                    var printerJob = PrinterJob.getPrinterJob();
+                    printerJob.setPageable(new PDFPageable(flatDoc));
+                    if (printerJob.printDialog()) {
+                        printerJob.print();
+                    }
+                } catch (PrinterException ex) {
+                    Platform.runLater(() -> showError("Print failed", ex));
+                } catch (Exception ex) {
+                    Platform.runLater(() -> showError("Print failed", ex));
+                } finally {
+                    try { Files.deleteIfExists(tmp); } catch (Exception ignored) {}
+                }
+            });
         });
+        flattenTask.setOnFailed(e -> showError("Print failed", flattenTask.getException()));
+        new Thread(flattenTask, "pdf-print-flatten").start();
     }
 
     private void exportFlattenedPdf() {

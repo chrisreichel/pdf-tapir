@@ -39,7 +39,8 @@ public class PdfFlattenExporter {
             basePdfBytes = buildCleanBase(document.getPdDocument());
         }
 
-        var tmp = File.createTempFile("ptapir-flat-", ".pdf", target.getParentFile());
+        var tmp = java.nio.file.Files.createTempFile("ptapir-flat-", ".pdf").toFile();
+        tmp.deleteOnExit(); // safety net in case of crash
         try (var flatDoc = Loader.loadPDF(basePdfBytes)) {
             flattener.flatten(flatDoc, document);
             // intentionally NOT writing the pdf-tapir metadata package
@@ -49,6 +50,20 @@ public class PdfFlattenExporter {
             tmp.delete();
             throw e;
         }
+    }
+
+    /**
+     * Flattens {@code document} into a temporary file managed by the JVM temp directory.
+     * The caller is responsible for deleting the file when done.
+     *
+     * @return path to the temporary flattened PDF
+     * @throws IOException if flattening fails
+     */
+    public java.nio.file.Path flattenToTemp(PdfDocument document) throws IOException {
+        java.nio.file.Path tmp = java.nio.file.Files.createTempFile("ptapir-print-", ".pdf");
+        tmp.toFile().deleteOnExit();
+        export(document, tmp.toFile());
+        return tmp;
     }
 
     private byte[] buildCleanBase(PDDocument source) throws IOException {
